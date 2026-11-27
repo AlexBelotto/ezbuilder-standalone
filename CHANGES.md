@@ -1,3 +1,9 @@
+# Clean source names (27 Nov 2026)
+
+- The app files (`index.html`, `css/`, `js/`, `templates/`) no longer mention the previous editor at all. The dialog class is now `.ez-mdl-dialog`, and the commands are `ez-get-inlined-html` and `ez-open-import-template`. Code comments describe the behavior directly. Nothing changes in the editor or the exported HTML.
+- The earlier notes below still name the previous version, and the tests in `test/` still check that it is never loaded. Neither is part of the app.
+- Full suite 443/443.
+
 # Fixes: color fields, Old Outlook line color, button corners (27 Nov 2026)
 
 - **Settings color fields** (social icon background, spacer background, divider line color): the code box, the picker and the recent-color swatches all sat on one row, which squeezed the code box to about 16px so you could not type in it. Now the code box and picker share one full-width row and the swatches wrap on their own row below. Fill fields (social, spacer, background, page) accept `transparent` in any case. It clears the fill, and there is a new "transparent" swatch, the white chip with a red slash. Their empty placeholder reads "transparent".

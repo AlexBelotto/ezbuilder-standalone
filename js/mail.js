@@ -1,5 +1,5 @@
 // Email export. This file turns the canvas HTML into the message that
-// Salesforce and old Outlook receive. It does not depend on GrapesJS.
+// Salesforce and old Outlook receive. It has no third-party dependencies.
 // The editor hands it a small surface: getHtml, Canvas.getFrameEl, loadHtml.
 (function () {
   var TITLE_KEY = 'newsletter-project-email-title';
@@ -528,7 +528,7 @@
     return doc.body.innerHTML;
   }
 
-  // Grapes keeps `.class` rules, and drops `a.class` into an extra selector the
+  // The editor keeps `.class` rules, and drops `a.class` into an extra selector the
   // style panel does not edit. Promote that simple form so the panel edits the
   // rule that actually paints.
   function promoteTagClassRules(editor) {
@@ -711,7 +711,7 @@
       return original(opts);
     };
     try {
-      return editor.runCommand('gjs-get-inlined-html', { preserveMediaQueries: true }) || '';
+      return editor.runCommand('ez-get-inlined-html', { preserveMediaQueries: true }) || '';
     } finally {
       editor.getHtml = original;
     }
@@ -1602,7 +1602,7 @@
     return { top: parts[0], right: parts[1], bottom: parts[2], left: parts[3] };
   }
 
-  // Grapes writes "margin:0;margin-left:auto" when a side is set on top of the
+  // The editor writes "margin:0;margin-left:auto" when a side is set on top of the
   // shorthand, so the declarations are read in order, last one winning.
   function marginSides(styleText) {
     var box = { top: '0', right: '0', bottom: '0', left: '0' };
@@ -2663,7 +2663,7 @@
     return match ? dedent(match[1]) + '\n' : '';
   }
 
-  // GrapesJS adds `* { box-sizing: border-box }` for the canvas. It is not part of the email.
+  // The editor canvas adds `* { box-sizing: border-box }`. It is not part of the email.
   function stripEditorBoxSizing(html) {
     return html.replace(/\sstyle=(['"])([\s\S]*?)\1/gi, function (_, quote, style) {
       var cleaned = style
@@ -2685,7 +2685,7 @@
   }
 
   function widen() {
-    var dialog = document.querySelector('.gjs-mdl-dialog');
+    var dialog = document.querySelector('.ez-mdl-dialog');
     if (dialog) dialog.style.width = 'min(760px, 94vw)';
   }
 
@@ -2726,7 +2726,7 @@
     area.focus();
   }
 
-  // GrapesJS calls commands as run(editor, sender, options). The sender is the
+  // Commands are called as run(editor, sender, options). The sender is the
   // editor when the code button has no sender, and that object has an html
   // function. Only a plain preset, the one Copy body passes, supplies HTML.
   function copyPreset(value) {
@@ -3155,7 +3155,7 @@
     realImageSources(editor);
     editor.Commands.add('nl-copy-html', { run: openCopy });
     editor.Commands.add('nl-copy-body', { run: function () { copyBody(editor, document.getElementById('nl-copy-body')); } });
-    editor.Commands.add('gjs-open-import-template', { run: openPaste });
+    editor.Commands.add('ez-open-import-template', { run: openPaste });
     editor.Commands.add('export-template', { run: openCopy });
 
     var pasteBtn = document.getElementById('nl-paste');
@@ -3175,7 +3175,7 @@
     messages[locale] = { panels: { buttons: { titles: titles } } };
     if (editor.I18n && editor.I18n.addMessages) editor.I18n.addMessages(messages);
 
-    var importButton = editor.Panels.getButton('options', 'gjs-open-import-template');
+    var importButton = editor.Panels.getButton('options', 'ez-open-import-template');
     if (importButton) importButton.set('attributes', { title: 'Paste HTML' });
     var exportButton = editor.Panels.getButton('options', 'export-template');
     if (exportButton) exportButton.set('attributes', { title: 'Copy HTML' });

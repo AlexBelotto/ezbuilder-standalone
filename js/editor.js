@@ -2,7 +2,7 @@
 // The email is a normal document inside the iframe. Every color, font, and
 // width is written on the element it belongs to. js/mail.js reads that
 // document and builds the HTML that Salesforce and old Outlook receive.
-// This file does not load GrapesJS, a server, or a stylesheet from the network.
+// This file does not load a third-party library, a server, or a stylesheet from the network.
 (function () {
   var STORE_KEY = 'ezbuilder-canvas';
   var MINE_KEY = 'ezbuilder-my-blocks';
@@ -732,7 +732,7 @@
     read.map['margin-left'] = align === 'left' ? '0' : 'auto';
     read.map['margin-right'] = align === 'right' ? '0' : 'auto';
     // align="left" or "right" floats a table or picture so the next block wraps
-    // beside it. The margins already place it, so stop the float (as GrapesJS did).
+    // beside it. The margins already place it, so stop the float.
     if ((el.tagName === 'TABLE' || el.tagName === 'IMG') && !read.map.float) read.map.float = 'none';
     writeStyle(el, read.map, read.order);
     if (el.tagName === 'TABLE' || el.tagName === 'IMG') el.setAttribute('align', align || 'left');
@@ -969,7 +969,7 @@
     markTree(doc.body);
     select(root);
     changed();
-    // The Image block opens the image library at once, as it did in GrapesJS.
+    // The Image block opens the image library at once.
     if (id === 'image' && root.tagName === 'IMG' && !add.quiet) pickImageFor(root);
     return root;
   }
@@ -1027,8 +1027,8 @@
   var TEXT_TAGS = /^(P|H[1-6]|LI|BLOCKQUOTE)$/;
   var INLINE_TAGS = /^(A|B|I|U|S|EM|STRONG|SPAN|FONT|BR|SMALL|SUB|SUP|BIG|MARK|STRIKE|CODE|IMG|LABEL|ABBR|TIME|WBR|DEL|INS|Q|CITE)$/;
 
-  // A box whose content is only words and inline tags is one Text, like GrapesJS
-  // reads it. Clicking a word selects that box, not the cell around it.
+  // A box whose content is only words and inline tags is one Text. Clicking a
+  // word selects that box, not the cell around it.
   function isTextBox(el) {
     if (!el || el.nodeType !== 1 || el === doc.body) return false;
     if (el.tagName === 'TD' || el.tagName === 'TH' || el.tagName === 'TABLE' || el.tagName === 'TR' || el.tagName === 'TBODY') return false;
@@ -1089,7 +1089,7 @@
     var cell = node.closest && node.closest('td, th');
     if (marked) {
       var kind = marked.getAttribute('data-ez');
-      // A column inside a block is its own element, as it was in GrapesJS.
+      // A column inside a block is its own element.
       if (cell && cell !== marked && marked.contains(cell) && kind !== 'divider' && kind !== 'spacer') return cell;
       return marked;
     }
@@ -3125,7 +3125,7 @@
     eye.innerHTML = iconSvg('M12 6.5C7 6.5 2.73 9.61 1 14c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 .01 6.01A3 3 0 0 0 12 11z');
     eye.addEventListener('click', function (event) {
       event.stopPropagation();
-      // Like the GrapesJS Layers eye, this hides the block in the canvas only.
+      // The Layers eye hides the block in the canvas only.
       // The exported email still has it. A display:none written in the email is shown again.
       if (decl(el, 'display') === 'none') {
         snapshot();
@@ -3957,7 +3957,7 @@
 
   function bindCanvas() {
     // A link in the email must never open inside the canvas. Doing so would
-    // replace the email page in the frame (GrapesJS blocks this too).
+    // replace the email page in the frame (so it is blocked).
     function stopLink(event) {
       var node = event.target;
       if (node && node.nodeType === 3) node = node.parentElement;
@@ -3993,7 +3993,7 @@
       if (!node || isHud(node)) return;
       if (node.nodeType === 3) node = node.parentElement;
       if (node.tagName === 'IMG') {
-        // As in GrapesJS, a double-click on a picture opens the image library.
+        // A double-click on a picture opens the image library.
         if (node.closest('[data-nl="social-element"]')) return;
         pickImageFor(node);
         return;
@@ -4134,7 +4134,7 @@
       event.preventDefault();
       removeSelected();
     } else if (!event.ctrlKey && !event.metaKey && !event.altKey && /^[wsad]$/.test(key) && picked.length) {
-      // GrapesJS keys: w previous, s next, a parent, d first child.
+      // Keys: w previous, s next, a parent, d first child.
       event.preventDefault();
       stepSelection(key);
     }
@@ -4406,7 +4406,7 @@
     applyFilter();
   }
 
-  // Preview, like the GrapesJS eye: the panels and block tools go away, nothing
+  // Preview (the eye): the panels and block tools go away, nothing
   // can be picked or edited, and a single button (or Escape) brings them back.
   function setPreview(on) {
     on = !!on;
@@ -4440,7 +4440,7 @@
     } catch (err) {}
   }
 
-  // Images off, like the GrapesJS newsletter toggle: pictures show as broken so
+  // Images off (the newsletter toggle): pictures show as broken so
   // the alt text is visible. The real address is kept in data-ez-src and put back
   // in every save, undo step, and export, so nothing is lost.
   var IMG_OFF = '##';
@@ -4509,7 +4509,7 @@
     });
   }
 
-  // GrapesJS drops whitespace-only text at the start or end of an element and any
+  // The editor drops whitespace-only text at the start or end of an element and any
   // that holds a line break. Pasted mail had it between cells and images, where
   // old Outlook can show it as a gap. A single space between words stays.
   function dropLayoutSpace(root) {
@@ -4635,9 +4635,9 @@
     }).filter(function (item) { return item && item.name && item.value; });
   }
 
-  // GrapesJS ran the pasted style block through an inliner on export: plain rules
-  // were written onto the elements they match, and media queries stayed in a
-  // style tag. This does the same, so Gmail and Outlook keep the pasted design.
+  // A pasted style block is inlined on export: plain rules are written onto
+  // the elements they match, and media queries stay in a style tag, so Gmail
+  // and Outlook keep the pasted design.
   // Top level rules of a style block, read from the text itself so colors and
   // values stay exactly as written (the browser would turn #e11d48 into rgb()).
   function cssBlocks(css) {
@@ -4676,9 +4676,9 @@
     return out;
   }
 
-  // GrapesJS ran the pasted style block through an inliner on export: plain rules
-  // were written onto the elements they match, and media queries stayed in a
-  // style tag. This does the same, so Gmail and Outlook keep the pasted design.
+  // A pasted style block is inlined on export: plain rules are written onto
+  // the elements they match, and media queries stay in a style tag, so Gmail
+  // and Outlook keep the pasted design.
   function inlineCss(html, css) {
     if (!css || !String(css).trim()) return { html: html, css: '' };
     var scratch = document.implementation.createHTMLDocument('');

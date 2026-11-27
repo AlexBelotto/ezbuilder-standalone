@@ -1025,7 +1025,7 @@ html, body, #app {
   justify-content: center;
 }
 
-.gjs-mdl-dialog {
+.ez-mdl-dialog {
   width: min(760px, 94vw);
   max-height: 88vh;
   overflow: auto;
