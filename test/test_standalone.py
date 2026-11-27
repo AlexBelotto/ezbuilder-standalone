@@ -194,7 +194,7 @@ def t_blocks(a):
   opened = a.ev("()=>!document.getElementById('ez-modal').hidden && document.getElementById('ez-modal-title').textContent")
   check('Image block opens the image library like GrapesJS', opened == 'Select Image', opened)
   a.pg.fill('.ez-am-add input', 'https://example.com/pic.png'); a.pg.click('.ez-am-add button'); a.wait(150)
-  a.pg.locator('.ez-am-card', has_text='pic.png').first.click(); a.wait(200)
+  a.pg.locator('.ez-am-card', has_text='pic.png').first.locator('.ez-am-pick').click(); a.wait(200)
   check('choosing a library image sets the picture', a.fev("()=>document.querySelector('img').getAttribute('src')") == 'https://example.com/pic.png')
   check('the library closes after a pick', a.ev("()=>document.getElementById('ez-modal').hidden"))
 
@@ -399,7 +399,7 @@ def t_rte(a):
   check('the new inline image is selected', info and info['sel'], info)
   check('the image library opens for the new inline image', a.ev("()=>!document.getElementById('ez-modal').hidden"))
   a.pg.fill('.ez-am-add input', 'https://example.com/icon-wide.png'); a.pg.click('.ez-am-add button'); a.wait(100)
-  a.pg.locator('.ez-am-card', has_text='icon-wide.png').first.click(); a.wait(250)
+  a.pg.locator('.ez-am-card', has_text='icon-wide.png').first.locator('.ez-am-pick').click(); a.wait(250)
   check('picking sets the inline image address', a.fev("()=>document.querySelector('[data-probe=t] img').getAttribute('src')") == 'https://example.com/icon-wide.png')
   # inline image settings: aspect lock, valign with baseline, link
   a.fev("()=>{const i=document.querySelector('[data-probe=t] img'); i.setAttribute('data-probe','ii'); i.setAttribute('width','32'); i.setAttribute('height','16'); i.style.width='32px'; i.style.height='16px';}")
@@ -1130,6 +1130,86 @@ def shots_v2(a):
   except Exception: pass
   check('v2 screenshots saved', os.path.exists(os.path.join(SHOTS, 'standalone_v2_editor.png')) and os.path.exists(os.path.join(SHOTS, 'standalone_v2_outlook.png')))
 
+# 1x1-ish PNGs as data URLs so thumbnails load with no network
+PNG_RED = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHwyBNAMDAD+mB/kZBj8mAAAAAElFTkSuQmCC'
+def am_open(a):
+  a.ev("()=>{const m=document.getElementById('ez-modal'); if(!m.hidden) document.getElementById('ez-modal-x').click()}")
+  a.frame.locator('[data-probe=pic]').dblclick(); a.wait(400)
+  return a.ev("()=>!document.getElementById('ez-modal').hidden && document.getElementById('ez-modal-title').textContent")
+def am_cards(a): return a.ev("()=>[...document.querySelectorAll('.ez-am-card')].map(c=>c.querySelector('.ez-am-name').textContent)")
+
+def t_assets(a):
+  a.ev("""(png)=>{localStorage.setItem('ezbuilder-assets', JSON.stringify([{src:png, name:'red-4x2.png'},{src:'https://cdn.invalid.example/missing.png', name:'missing.png'},{src:'https://cdn.invalid.example/keep.png', name:'keep.png'}])); localStorage.removeItem('ezbuilder-assets-hidden')}""", PNG_RED)
+  a.build('<table data-nl="section" width="100%"><tr><td><img data-probe="pic" src="SRC" width="200" alt="Red bar" style="display:block;width:200px"></td></tr></table>'.replace('SRC', PNG_RED))
+  title = am_open(a)
+  check('double-clicking an image opens Select Image', title == 'Select Image', title)
+  w = a.ev("()=>{const i=document.querySelector('.ez-am-url input'), b=document.querySelector('.ez-am-url'); return [i.getBoundingClientRect().width, b.getBoundingClientRect().width, document.querySelector('.ez-am-add').getBoundingClientRect().width]}")
+  check('image address field fills its box (> 85%)', w[0] > 0.85 * w[1], w)
+  check('image address box takes most of the row', w[1] > 0.7 * w[2], w)
+  check('image address field has focus when the dialog opens', a.ev("()=>document.activeElement && document.activeElement.closest('.ez-am-url') !== null"))
+  a.wait(400)
+  th = a.ev("()=>[...document.querySelectorAll('.ez-am-card')].map(c=>{const i=c.querySelector('img.ez-am-img'); const r=i?i.getBoundingClientRect():{width:0,height:0}; return {name:c.querySelector('.ez-am-name').textContent, img:!!i, w:r.width, h:r.height, nat:i?i.naturalWidth:0, op:i?getComputedStyle(i).opacity:'0', dim:c.querySelector('.ez-am-dim').textContent, broken:c.querySelector('.ez-am-thumb').classList.contains('is-broken')}})")
+  red = [t for t in th if t['name'] == 'red-4x2.png']
+  check('every card has a real <img> thumbnail', th and all(t['img'] for t in th), th)
+  check('a loaded thumbnail is visible and fitted', red and red[0]['w'] > 40 and red[0]['h'] > 10 and red[0]['nat'] == 4 and red[0]['op'] == '1', red)
+  check('cards show the image dimensions', red and red[0]['dim'] == '4 × 2', red)
+  miss = [t for t in th if t['name'] == 'missing.png']
+  check('a broken image shows a clean fallback, not a broken icon', miss and miss[0]['broken'] and miss[0]['dim'] == 'Could not load', miss)
+  check('the image used in the email is marked', a.ev("()=>[...document.querySelectorAll('.ez-am-card')].some(c=>c.querySelector('.ez-am-used'))"))
+  # preview
+  card = a.pg.locator('.ez-am-card', has_text='red-4x2.png').first
+  card.hover(); a.wait(150)
+  card.locator('.ez-am-zoom').click(); a.wait(250)
+  v = a.ev("()=>{const v=document.querySelector('.ez-am-view'); return {open:!v.hidden, img:!!v.querySelector('.ez-am-stage img'), dim:v.querySelector('.ez-am-dim').textContent, grid:getComputedStyle(document.querySelector('.ez-am-grid')).display}}")
+  check('the eye button opens a large preview with the size', v['open'] and v['img'] and '4 × 2' in v['dim'] and v['grid'] == 'none', v)
+  check('preview does not pick the image or close the dialog', a.ev("()=>!document.getElementById('ez-modal').hidden"))
+  a.pg.locator('.ez-am-view .ez-am-back').click(); a.wait(100)
+  check('Back returns to the grid', a.ev("()=>document.querySelector('.ez-am-view').hidden && getComputedStyle(document.querySelector('.ez-am-grid')).display==='grid'"))
+  # delete
+  before = am_cards(a)
+  card = a.pg.locator('.ez-am-card', has_text='keep.png').first
+  card.hover(); a.wait(120)
+  html0 = a.export()
+  card.locator('.ez-am-del').click(); a.wait(200)
+  after = am_cards(a)
+  check('the delete button removes the image from the list', 'keep.png' not in after and len(after) == len(before) - 1, (before, after))
+  check('delete does not pick an image or close the dialog', a.ev("()=>!document.getElementById('ez-modal').hidden") and a.export() == html0)
+  check('delete is saved in the browser', 'keep.png' not in a.ev("()=>localStorage.getItem('ezbuilder-assets')"))
+  # delete an image the email uses: list loses it, canvas keeps it
+  card = a.pg.locator('.ez-am-card:has(.ez-am-used)').first
+  card.hover(); card.locator('.ez-am-del').click(); a.wait(200)
+  check('deleting a used image keeps it in the email', a.fev("()=>!!document.querySelector('[data-probe=pic]') && document.querySelector('[data-probe=pic]').getAttribute('src').startsWith('data:image/png')") and a.export() == html0)
+  check('the deleted used image leaves the list', not a.ev("()=>[...document.querySelectorAll('.ez-am-card')].some(c=>c.querySelector('.ez-am-used'))"))
+  # delete from the preview
+  card = a.pg.locator('.ez-am-card', has_text='missing.png').first
+  card.hover(); card.locator('.ez-am-zoom').click(); a.wait(150)
+  a.pg.locator('.ez-am-view .ez-am-view-del').click(); a.wait(150)
+  check('Delete in the preview removes it and returns to the grid', 'missing.png' not in am_cards(a) and a.ev("()=>document.querySelector('.ez-am-view').hidden"))
+  # pick still works
+  a.pg.fill('.ez-am-url input', 'https://cdn.invalid.example/new.png'); a.pg.click('.ez-am-add button'); a.wait(150)
+  check('adding an address puts it first', am_cards(a)[:1] == ['new.png'], am_cards(a))
+  a.pg.locator('.ez-am-card', has_text='new.png').first.locator('.ez-am-pick').click(); a.wait(200)
+  check('clicking a card uses the image and closes the dialog', a.ev("()=>document.getElementById('ez-modal').hidden") and a.fev("()=>document.querySelector('[data-probe=pic]').getAttribute('src')") == 'https://cdn.invalid.example/new.png')
+  a.ev("()=>EzApp.undo()"); a.wait(150)
+  # filter
+  a.ev("()=>{const l=JSON.parse(localStorage.getItem('ezbuilder-assets')); for(let i=0;i<8;i++) l.push({src:'https://cdn.invalid.example/f'+i+'.png', name:'filler-'+i+'.png'}); localStorage.setItem('ezbuilder-assets', JSON.stringify(l))}")
+  am_open(a)
+  check('a filter appears when the library is large', a.ev("()=>!document.querySelector('.ez-am-search').hidden"))
+  a.pg.fill('.ez-am-search', 'filler-3'); a.wait(100)
+  check('the filter narrows the cards', am_cards(a) == ['filler-3.png'], am_cards(a))
+  a.pg.fill('.ez-am-search', 'zzz-none'); a.wait(100)
+  check('the filter says when nothing matches', not am_cards(a) and 'No image matches' in a.ev("()=>document.querySelector('.ez-am-empty').textContent"))
+  a.pg.click('#ez-modal-x'); a.wait(150)
+  # reload keeps deletions (also for images found in the email)
+  a.pg.reload(); a.pg.wait_for_function('()=>window.EzApp && window.EzApp.column()'); a.wait(400)
+  a.frame = a.pg.locator('#ez-frame').element_handle().content_frame()
+  a.build('<table data-nl="section" width="100%"><tr><td><img data-probe="pic" src="SRC" width="200" alt="Red bar" style="display:block;width:200px"></td></tr></table>'.replace('SRC', PNG_RED))
+  am_open(a)
+  names = am_cards(a)
+  check('deleted images stay deleted after a reload', not ({'keep.png', 'missing.png'} & set(names)) and not a.ev("()=>[...document.querySelectorAll('.ez-am-card')].some(c=>c.querySelector('.ez-am-used'))"), names)
+  a.pg.click('#ez-modal-x'); a.wait(100)
+  check('no errors in the image browser', not a.errors, a.errors)
+
 def main():
   with sync_playwright() as p:
     b = p.chromium.launch()
@@ -1138,7 +1218,7 @@ def main():
     t_startup(b, srv)
     a = App(b, url)
     for fn in (t_catalog, t_toolbar, t_blocks, t_dnd, t_selection, t_layers, t_rte, t_style, t_settings, t_views, t_io,
-               t_resize, t_canvas_ui, t_keyboard, t_inspector_v2, t_check, t_messy, t_reliability):
+               t_resize, t_canvas_ui, t_keyboard, t_inspector_v2, t_check, t_messy, t_reliability, t_assets):
       try:
         a.errors.clear(); fn(a)
       except Exception as e:

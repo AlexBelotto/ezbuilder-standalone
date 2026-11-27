@@ -8,7 +8,17 @@
   var MINE_KEY = 'ezbuilder-my-blocks';
   var ASSET_KEY = 'ezbuilder-assets';
   var assetMemory = [];
-  var hiddenAssets = {};
+  var HIDDEN_ASSET_KEY = 'ezbuilder-assets-hidden';
+  // Images removed from the library stay removed after a reload, even when the
+  // email still uses them (the email itself is never changed by a removal).
+  var hiddenAssets = (function () {
+    try {
+      var list = JSON.parse(localStorage.getItem('ezbuilder-assets-hidden') || '[]');
+      var out = {};
+      if (Array.isArray(list)) list.forEach(function (src) { if (typeof src === 'string') out[src] = true; });
+      return out;
+    } catch (err) { return {}; }
+  })();
   var FONT = 'Arial, Helvetica, sans-serif';
   var FONTS = [FONT, 'Georgia, serif', '"Times New Roman", Times, serif', 'Verdana, Geneva, sans-serif', 'Tahoma, Geneva, sans-serif', '"Courier New", Courier, monospace'];
   var frame = document.getElementById('ez-frame');
@@ -1463,13 +1473,23 @@
     try { localStorage.setItem(ASSET_KEY, JSON.stringify(assetMemory)); } catch (err) {}
   }
 
+  function writeHidden() {
+    try { localStorage.setItem(HIDDEN_ASSET_KEY, JSON.stringify(Object.keys(hiddenAssets).slice(-300))); } catch (err) {}
+  }
+
   function rememberAsset(src, name) {
     var next = cleanImageSrc(src);
     if (next == null || !next) return;
-    delete hiddenAssets[next];
+    if (hiddenAssets[next]) { delete hiddenAssets[next]; writeHidden(); }
     var list = readAssets().filter(function (item) { return item.src !== next; });
     list.unshift({ src: next, name: name || assetName(next) });
     writeAssets(list);
+  }
+
+  function forgetAsset(src) {
+    hiddenAssets[src] = true;
+    writeHidden();
+    writeAssets(readAssets().filter(function (asset) { return asset.src !== src; }));
   }
 
   function canvasSrcs() {
@@ -1486,13 +1506,18 @@
   function assetList() {
     var seen = {};
     var out = [];
-    readAssets().concat(canvasSrcs().map(function (src) { return { src: src, name: assetName(src) }; })).forEach(function (item) {
+    var used = {};
+    canvasSrcs().forEach(function (src) { used[src] = true; });
+    readAssets().concat(Object.keys(used).map(function (src) { return { src: src, name: assetName(src) }; })).forEach(function (item) {
       if (!item || !item.src || seen[item.src] || hiddenAssets[item.src]) return;
       seen[item.src] = true;
-      out.push(item);
+      out.push({ src: item.src, name: item.name || assetName(item.src), used: !!used[item.src] });
     });
     return out;
   }
+
+  var TRASH_ICON = 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z';
+  var EYE_ICON = 'M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z';
 
   function openAssets(opts) {
     opts = opts || {};
@@ -1500,12 +1525,14 @@
     root.className = 'ez-am';
     var form = document.createElement('form');
     form.className = 'ez-am-add';
-    var box = controlBox();
+    var box = controlBox('ez-am-url');
     var input = document.createElement('input');
-    input.type = 'text';
+    input.type = 'url';
     input.className = 'ez-input';
-    input.placeholder = 'https://example.com/image.png';
+    input.placeholder = 'Paste an image address, e.g. https://example.com/image.png';
     input.setAttribute('aria-label', 'Image address');
+    input.spellcheck = false;
+    input.autocomplete = 'off';
     box.appendChild(input);
     var add = document.createElement('button');
     add.type = 'submit';
@@ -1514,12 +1541,31 @@
     form.appendChild(box);
     form.appendChild(add);
     root.appendChild(form);
+    var bar = document.createElement('div');
+    bar.className = 'ez-am-bar';
+    var count = document.createElement('span');
+    count.className = 'ez-am-count';
+    var search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'ez-am-search';
+    search.placeholder = 'Filter images';
+    search.setAttribute('aria-label', 'Filter images');
+    bar.appendChild(count);
+    bar.appendChild(search);
+    root.appendChild(bar);
     var grid = document.createElement('div');
     grid.className = 'ez-am-grid';
+    grid.setAttribute('role', 'list');
     root.appendChild(grid);
     var hint = document.createElement('p');
     hint.className = 'ez-note ez-am-empty';
     root.appendChild(hint);
+    // Large preview inside the dialog: the picture at full fit, its size,
+    // address, and the two actions.
+    var view = document.createElement('div');
+    view.className = 'ez-am-view';
+    view.hidden = true;
+    root.appendChild(view);
     if (!opts.httpOnly) {
       var drop = document.createElement('div');
       drop.className = 'ez-am-drop';
@@ -1530,14 +1576,14 @@
       file.multiple = true;
       drop.appendChild(file);
       root.appendChild(drop);
-      function takeFiles(files) {
+      var takeFiles = function (files) {
         Array.prototype.forEach.call(files || [], function (item) {
           if (!item || !/^image\/(png|jpeg|gif|webp)$/i.test(item.type)) {
-            status('Use a PNG, JPEG, GIF, or WebP file.');
+            status('Use a PNG, JPEG, GIF, or WebP file.', 'error');
             return;
           }
           if (item.size > 1200000) {
-            status('That file is too large to keep in the browser.');
+            status('That file is too large to keep in the browser.', 'error');
             return;
           }
           var reader = new FileReader();
@@ -1547,7 +1593,7 @@
           };
           reader.readAsDataURL(item);
         });
-      }
+      };
       file.addEventListener('change', function () { takeFiles(file.files); file.value = ''; });
       drop.addEventListener('dragover', function (event) {
         event.preventDefault();
@@ -1560,65 +1606,174 @@
         takeFiles(event.dataTransfer && event.dataTransfer.files);
       });
     }
+    function choose(src) {
+      if (opts.onSelect) opts.onSelect(src);
+      editor.Modal.close();
+    }
+    function remove(item) {
+      forgetAsset(item.src);
+      view.hidden = true;
+      paint();
+      status(item.used ? 'Removed from the library. The email still uses it.' : 'Removed from the library.', 'ok');
+    }
+    function showView(item, dims) {
+      view.innerHTML = '';
+      var stage = document.createElement('div');
+      stage.className = 'ez-am-stage';
+      var big = document.createElement('img');
+      big.alt = item.name;
+      big.src = item.src;
+      stage.appendChild(big);
+      var meta = document.createElement('div');
+      meta.className = 'ez-am-meta';
+      var title = document.createElement('strong');
+      title.textContent = item.name;
+      var size = document.createElement('span');
+      size.className = 'ez-am-dim';
+      size.textContent = dims || '';
+      big.addEventListener('load', function () { size.textContent = big.naturalWidth + ' × ' + big.naturalHeight + ' px'; });
+      big.addEventListener('error', function () { stage.classList.add('is-broken'); size.textContent = 'Could not load this image.'; });
+      var url = document.createElement('input');
+      url.className = 'ez-am-src';
+      url.readOnly = true;
+      url.value = /^data:/i.test(item.src) ? 'Uploaded file (stored in this browser)' : item.src;
+      url.setAttribute('aria-label', 'Image address');
+      var actions = document.createElement('div');
+      actions.className = 'ez-am-actions';
+      var back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'nl-btn secondary ez-am-back';
+      back.textContent = 'Back';
+      back.addEventListener('click', function () { view.hidden = true; });
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'nl-btn secondary ez-am-view-del';
+      del.textContent = 'Delete';
+      del.addEventListener('click', function () { remove(item); });
+      var use = document.createElement('button');
+      use.type = 'button';
+      use.className = 'nl-btn ez-am-use';
+      use.textContent = 'Use this image';
+      use.addEventListener('click', function () { choose(item.src); });
+      actions.appendChild(back);
+      actions.appendChild(del);
+      actions.appendChild(use);
+      meta.appendChild(title);
+      meta.appendChild(size);
+      meta.appendChild(url);
+      meta.appendChild(actions);
+      view.appendChild(stage);
+      view.appendChild(meta);
+      view.hidden = false;
+      use.focus();
+    }
     function paint() {
       grid.innerHTML = '';
-      var list = assetList();
-      hint.textContent = list.length ? '' : (opts.httpOnly ? 'No images yet. Add a web address.' : 'No images yet. Add an address or drop a file.');
+      var all = assetList();
+      var q = search.value.trim().toLowerCase();
+      var list = q ? all.filter(function (item) { return (item.name + ' ' + item.src).toLowerCase().indexOf(q) !== -1; }) : all;
+      count.textContent = all.length === 1 ? '1 image' : all.length + ' images';
+      bar.hidden = !all.length;
+      search.hidden = all.length < 7 && !q;
+      hint.textContent = all.length ? (list.length ? '' : 'No image matches “' + search.value.trim() + '”.') : (opts.httpOnly ? 'No images yet. Add a web address.' : 'No images yet. Add an address or drop a file.');
       hint.hidden = !!list.length;
       list.forEach(function (item) {
-        var card = document.createElement('button');
-        card.type = 'button';
+        var card = document.createElement('div');
         card.className = 'ez-am-card';
-        var preview = document.createElement('span');
-        preview.className = 'ez-am-preview';
-        preview.style.backgroundImage = 'url("' + String(item.src).replace(/["\\\n\r]/g, '') + '")';
-        var close = document.createElement('span');
-        close.className = 'ez-am-x';
-        close.textContent = '×';
-        close.title = 'Remove from the library';
-        close.addEventListener('click', function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-          hiddenAssets[item.src] = true;
-          writeAssets(readAssets().filter(function (asset) { return asset.src !== item.src; }));
-          paint();
-        });
-        preview.appendChild(close);
+        card.setAttribute('role', 'listitem');
+        card.setAttribute('data-src', item.src);
+        var pick = document.createElement('button');
+        pick.type = 'button';
+        pick.className = 'ez-am-pick';
+        pick.title = 'Use ' + item.name;
+        var thumb = document.createElement('span');
+        thumb.className = 'ez-am-thumb';
+        var img = document.createElement('img');
+        img.className = 'ez-am-img';
+        img.alt = '';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.draggable = false;
         var name = document.createElement('span');
         name.className = 'ez-am-name';
-        name.textContent = item.name || assetName(item.src);
+        name.textContent = item.name;
         var dim = document.createElement('span');
         dim.className = 'ez-am-dim';
-        dim.textContent = '…';
-        card.appendChild(preview);
-        card.appendChild(name);
-        card.appendChild(dim);
-        card.addEventListener('click', function () {
-          if (opts.onSelect) opts.onSelect(item.src);
-          editor.Modal.close();
+        dim.textContent = 'Loading…';
+        img.addEventListener('load', function () {
+          thumb.classList.add('is-loaded');
+          dim.textContent = img.naturalWidth + ' × ' + img.naturalHeight;
         });
+        img.addEventListener('error', function () {
+          thumb.classList.add('is-broken');
+          dim.textContent = 'Could not load';
+        });
+        img.src = item.src;
+        thumb.appendChild(img);
+        if (item.used) {
+          var badge = document.createElement('span');
+          badge.className = 'ez-am-used';
+          badge.textContent = 'In email';
+          thumb.appendChild(badge);
+        }
+        pick.appendChild(thumb);
+        pick.appendChild(name);
+        pick.appendChild(dim);
+        pick.addEventListener('click', function () { choose(item.src); });
+        var tools = document.createElement('span');
+        tools.className = 'ez-am-tools';
+        var zoom = document.createElement('button');
+        zoom.type = 'button';
+        zoom.className = 'ez-am-zoom';
+        zoom.title = 'Preview';
+        zoom.setAttribute('aria-label', 'Preview ' + item.name);
+        zoom.innerHTML = iconSvg(EYE_ICON);
+        zoom.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          showView(item, dim.textContent);
+        });
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'ez-am-del';
+        del.title = 'Delete from the library';
+        del.setAttribute('aria-label', 'Delete ' + item.name + ' from the library');
+        del.innerHTML = iconSvg(TRASH_ICON);
+        del.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          remove(item);
+        });
+        tools.appendChild(zoom);
+        tools.appendChild(del);
+        card.appendChild(pick);
+        card.appendChild(tools);
         grid.appendChild(card);
-        var probe = new Image();
-        probe.onload = function () {
-          if (probe.naturalWidth) dim.textContent = probe.naturalWidth + ' × ' + probe.naturalHeight;
-        };
-        probe.onerror = function () { dim.textContent = ''; };
-        probe.src = item.src;
       });
     }
+    search.addEventListener('input', paint);
     form.addEventListener('submit', function (event) {
       event.preventDefault();
       var next = opts.httpOnly ? cleanSocialSrc(input.value) : cleanImageSrc(input.value);
       if (next == null || !next) {
-        status('That address was not saved.');
+        status('That address was not saved.', 'error');
         return;
       }
       rememberAsset(next);
       input.value = '';
+      search.value = '';
       paint();
+    });
+    root.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !view.hidden) {
+        event.preventDefault();
+        event.stopPropagation();
+        view.hidden = true;
+      }
     });
     paint();
     editor.Modal.open({ title: 'Select Image', content: root });
+    setTimeout(function () { try { input.focus(); } catch (err) {} }, 30);
   }
 
   function realSrc(img) {

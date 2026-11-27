@@ -1,3 +1,26 @@
+# Image browser upgrade (27 Nov 2026)
+
+The Select Image dialog had no stylesheet rules for its address field or cards, so the
+address field kept the browser's default width (about a quarter of its box), and the
+preview area had no height, which hid both the picture and its remove button.
+
+- The address field fills its whole box, is focused when the dialog opens, and highlights
+  on focus.
+- Every card shows a real thumbnail (`<img>`, fitted with `object-fit: contain` on a
+  checkerboard so transparent PNGs read clearly), the file name and its pixel size. Images
+  that fail to load show "Image unavailable" instead of a broken icon. Images already used
+  in the email get an "In email" tag.
+- Each card has Preview (eye) and Delete (trash) buttons, shown on hover or keyboard focus.
+  Neither picks the image or closes the dialog. Preview shows the picture large with its
+  size and address, plus Back, Delete and Use this image.
+- Deleting removes the image from the library and is remembered after a reload
+  (`ezbuilder-assets-hidden`), including images found in the email. The email itself is
+  never changed: a placed image stays where it is. Adding the same address again brings it
+  back.
+- A filter box appears once the library has 7 or more images.
+- Tests: 25 new checks (field width, thumbnails, fallback, preview, delete from the card and
+  from the preview, delete of an image in use, persistence across reload, filter).
+
 # EzBuilder standalone v2: studio polish (27 Nov 2026)
 
 Still no GrapesJS, no build step, no network: plain HTML, CSS and JavaScript from file:// or
