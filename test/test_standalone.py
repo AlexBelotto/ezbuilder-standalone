@@ -1293,6 +1293,66 @@ def t_colors(a):
     check('Page background: f4f4f4 → #f4f4f4 in the export', r['final'] == '#f4f4f4' and '#f4f4f4' in a.export(), r)
   check('no errors in color fields', not a.errors, a.errors)
 
+def t_sfmc(b):
+  path = os.path.join(ROOT, 'templates', 'sfmc-template.html')
+  check('SFMC template exists in templates/', os.path.exists(path), path)
+  if not os.path.exists(path): return
+  tpl = open(path, encoding='utf-8').read()
+  check('template keeps both tracking tags', '<custom name="opencounter" type="tracking"/>' in tpl and '<custom name="usermatch" type="tracking" />' in tpl)
+  slot = re.search(r'<div data-type="slot" data-key="bodycontent" data-allowed-blocks="textblock; imageblock; buttonblock; htmlblock; dynamicblock; enhanceddynamicblock" data-label="[^"]+"></div>', tpl)
+  check('template has the Content Builder body slot', slot is not None)
+  check('template has the Content Builder wrapper fixes', all(x in tpl for x in ('.stylingblock-content-wrapper', '.camarker-inner', '.email-shell', 'table[width="600"]')))
+  check('Outlook settings appear once (no duplicate VML/OfficeDocumentSettings)', tpl.count('<o:OfficeDocumentSettings>') == 1 and tpl.count('behavior:url(#default#VML)') == 2 and '.nl-vbg' in tpl)
+  check('light-only color scheme is declared', 'name="color-scheme" content="light only"' in tpl and 'supported-color-schemes: light' in tpl)
+  css = ' '.join(re.findall(r'<style[^>]*>(.*?)</style>', re.sub(r'/\*.*?\*/', '', tpl, flags=re.S), flags=re.S))
+  flat = re.sub(r'\s+', '', css)
+  check('no rule forces display:block on every image (inline images stay inline)', 'display:block' not in flat, flat[:200])
+  check('no !important border-collapse that would square rounded boxes', not re.search(r'border-collapse:collapse!important', flat))
+  check('no MJML or campaign leftovers', not re.search(r'mj-column|mj-outlook|mj-full-width|btn-agendar|slogan|fonts\.googleapis|force-text|bg-light', tpl))
+  # build an email with the key blocks
+  a = App(b, 'file://' + ROOT + '/index.html')
+  a.clear()
+  for bid in ('email-hero', 'email-icon-text', 'text', 'sect50', 'button', 'divider', 'email-social-group'):
+    a.ev("(x)=>EzApp.add(x,{quiet:true})", bid)
+  a.wait(200)
+  sel_q(a, '[data-nl=icon-text]'); a.tab('config'); a.set_field('config', 'block-width', '480px'); a.set_field('config', 'block-align', 'center')
+  a.ev("""()=>{const d=EzApp.frame().contentDocument; const p=[...d.querySelectorAll('[data-ez=text]')].pop();
+    p.innerHTML='Inline <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHwyBNAMDAD+mB/kZBj8mAAAAAElFTkSuQmCC" alt="" width="20" height="20" border="0" data-nl="inline-image" data-ez="image" style="display:inline-block;vertical-align:middle;width:20px;height:20px;border:0;outline:none;margin:0 4px;"> picture'; EzApp._.changed()}""")
+  a.ev("()=>{const d=EzApp.frame().contentDocument; EzApp.select([...d.querySelectorAll('table[data-nl=section]')].pop().querySelector('td'))}")
+  a.ev("()=>EzApp.add('email-hspacer')"); a.wait(150)
+  sel_q(a, '[data-nl=social-element]'); a.tab('config'); a.set_field('config', 'social-gap', '20')
+  a.wait(300)
+  body = a.ev("()=>NewsletterHtmlIO.exportBody(editor)")
+  a.ctx.close()
+  check('Copy body has the key blocks', all(x in body for x in ('<v:rect', 'data-nl="icon-text"', 'data-nl="inline-image"', 'data-nl="hspacer"', 'data-nl-gap="20"', 'data-ez="divider"')), [x for x in ('<v:rect', 'data-nl="icon-text"', 'data-nl="inline-image"', 'data-nl="hspacer"', 'data-nl-gap="20"', 'data-ez="divider"') if x not in body])
+  # what Content Builder sends: its wrapper around the HTML block in the slot
+  block = ('<table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="min-width: 100%;" class="stylingblock-content-wrapper"><tr>'
+           '<td class="stylingblock-content-wrapper camarker-inner">' + body + '</td></tr></table>')
+  page = tpl.replace(slot.group(0), block)
+  for w, h in ((1280, 900), (375, 800)):
+    ctx = b.new_context(viewport={'width': w, 'height': h}); pg = ctx.new_page(); errs = []
+    pg.on('pageerror', lambda e: errs.append(str(e)))
+    pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'Failed to load resource' not in m.text and 'ERR_NAME' not in m.text else None)
+    pg.set_content(page); pg.wait_for_timeout(400)
+    r = pg.evaluate("""()=>{const box=e=>{const r=e.getBoundingClientRect(); return {l:Math.round(r.left), r:Math.round(r.right), w:Math.round(r.width)}};
+      const shell=document.querySelector('.email-shell'); const inl=document.querySelector('img[data-nl=inline-image]'); const it=document.querySelector('[data-nl=icon-text]');
+      const its=getComputedStyle(it); const p=inl.closest('p,div,td');
+      return {vw: innerWidth, doc: document.documentElement.scrollWidth, shell: box(shell), it: box(it), itCollapse: its.borderCollapse, itRadius: its.borderTopLeftRadius,
+        inlDisplay: getComputedStyle(inl).display, inlTop: Math.round(inl.getBoundingClientRect().top), textTop: Math.round(p.getBoundingClientRect().top),
+        widest: Math.max(...[...document.body.querySelectorAll('*')].map(e=>e.getBoundingClientRect().right)),
+        social: [...document.querySelectorAll('[data-nl=social-element]')].length}}""")
+    if w == 1280:
+      check('desktop: the email column is 600px and centered', r['shell']['w'] == 600 and abs(r['shell']['l'] - (r['vw'] - 600) / 2) <= 1, r['shell'])
+      check('desktop: Icon + text stays 480px and centered in the column', r['it']['w'] == 480 and abs((r['it']['l'] + r['it']['r']) / 2 - (r['shell']['l'] + r['shell']['r']) / 2) <= 1, (r['it'], r['shell']))
+    else:
+      check('phone 375px: the column fills the screen with no sideways scroll', r['shell']['w'] == 375 and r['doc'] <= 375 and r['widest'] <= 376, (r['shell'], r['doc'], r['widest']))
+    check('%dpx: inline image stays inline in the text' % w, r['inlDisplay'] in ('inline-block', 'inline'), r['inlDisplay'])
+    check('%dpx: Icon + text keeps separate borders and 12px corners' % w, r['itCollapse'] == 'separate' and r['itRadius'] == '12px', (r['itCollapse'], r['itRadius']))
+    check('%dpx: template renders with no console or page errors' % w, not errs, errs)
+    if w == 1280: pg.screenshot(path=os.path.join(SHOTS, 'standalone_sfmc_desktop.png'), full_page=True)
+    else: pg.screenshot(path=os.path.join(SHOTS, 'standalone_sfmc_mobile.png'), full_page=True)
+    ctx.close()
+
 def main():
   with sync_playwright() as p:
     b = p.chromium.launch()
@@ -1319,6 +1379,8 @@ def main():
     a.ctx.close()
     try: t_persistence(b, url)
     except Exception as e: check('t_persistence ran without a test crash', False, repr(e)[:800])
+    try: t_sfmc(b)
+    except Exception as e: check('t_sfmc ran without a test crash', False, repr(e)[:800])
     try: t_layout(b, url, 'http://127.0.0.1:%d/index.html' % srv.server_address[1])
     except Exception as e: check('t_layout ran without a test crash', False, repr(e)[:800])
     srv.shutdown(); b.close()

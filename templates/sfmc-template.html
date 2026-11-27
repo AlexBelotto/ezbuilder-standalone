@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="und" dir="auto" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <!--
+    EzBuilder standalone: Salesforce Marketing Cloud (Content Builder) template.
+
+    How to use it
+    1. Content Builder > Create > Template > Paste HTML, and paste this whole file.
+    2. Create an email from the template. Drop ONE "HTML" block into Body Content.
+    3. In EzBuilder press "Copy body" and paste the result into that HTML block.
+
+    What Copy body brings with it, so this file does not repeat it:
+    - The Outlook width rules (.nl-ow1, .nl-ow2, ...), in its own <style> tags.
+    - The rule that hides solid colors behind VML background pictures in Outlook
+      (.nl-vbg), when the email has one.
+    - Every color, size, margin and alignment, written on the elements.
+
+    What this file adds: the 600px centered column, the Content Builder wrapper fixes,
+    phone sizing, light mode only, and the Outlook (Word) settings.
+
+    Leave the two <custom ... type="tracking"> tags where they are.
+    Page color: EzBuilder's page background is not part of Copy body. If your email uses
+    one, change #ffffff in the two places marked PAGE COLOR below (body and outer table).
+    Language: change lang="und" to your language (for example lang="es").
+
+    Kept in the EzBuilder repo: templates/sfmc-template.html. Update it with EzBuilder.
+  -->
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--[if !mso]><!-->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--<![endif]-->
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light">
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+  <title></title>
+  <!--[if gte mso 9]>
+  <xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml>
+  <style>
+    v\:* { behavior:url(#default#VML); display:inline-block; }
+    o\:* { behavior:url(#default#VML); }
+    /* Section background pictures are VML in Outlook. The CSS color behind them is
+       made transparent so it does not cover the picture. Copy body also brings this
+       rule; it is here too in case a block is pasted without it. */
+    .nl-vbg { background:transparent !important; background-color:transparent !important; }
+  </style>
+  <![endif]-->
+  <style type="text/css">
+    :root {
+      color-scheme: light only;
+      supported-color-schemes: light;
+    }
+    #outlook a { padding: 0; }
+    body {
+      margin: 0;
+      padding: 0;
+      word-spacing: normal;
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+    /* No !important here: EzBuilder writes border-collapse:separate on rounded boxes
+       (Icon + text, callouts, buttons). An !important rule would square their corners. */
+    table, td {
+      border-collapse: collapse;
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    /* No display rule on images: EzBuilder writes display:block on block pictures, and
+       pictures inside text (data-nl="inline-image") must stay inline with the words. */
+    img {
+      border: 0;
+      outline: none;
+      text-decoration: none;
+      -ms-interpolation-mode: bicubic;
+    }
+    .ExternalClass,
+    .ExternalClass * { line-height: 100%; }
+    /* Apple Mail and iOS turn dates, phones and addresses into blue links. */
+    a[x-apple-data-detectors] {
+      color: inherit !important;
+      text-decoration: none !important;
+      font-size: inherit !important;
+      font-family: inherit !important;
+      font-weight: inherit !important;
+      line-height: inherit !important;
+    }
+    /* Content Builder wraps an HTML block in its own table and stretches it to the page.
+       Keep its padding off, and do not let it grow past the column. */
+    .stylingblock-content-wrapper,
+    .stylingblock-content-margin-cell,
+    .camarker-inner {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .stylingblock-content-wrapper {
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 600px !important;
+    }
+    /* A 600px table has nothing of its own to center it. The column and every 600px
+       table inside it (EzBuilder's email column) stay in the middle of the page. */
+    .email-shell,
+    table[width="600"] {
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }
+    .email-shell {
+      width: 600px !important;
+      max-width: 600px !important;
+    }
+    @media only screen and (max-width: 620px) {
+      /* On a phone the column shrinks to the screen. */
+      .email-shell,
+      table[width="600"],
+      .stylingblock-content-wrapper {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+      }
+      /* Fixed-width boxes (a 480px Icon + text, a callout, a button) shrink to the screen
+         instead of pushing it sideways. They keep their alignment and rounded corners. */
+      .email-shell table {
+        max-width: 100% !important;
+      }
+      /* Full-width tables lay out from their own width, not from the widest box inside,
+         so the max-width above can take effect inside them. */
+      .email-shell table[width="600"],
+      .email-shell table[width="100%"] {
+        table-layout: fixed !important;
+      }
+      /* Pictures never push past the screen; their display is left as EzBuilder wrote it. */
+      img {
+        max-width: 100% !important;
+        height: auto !important;
+      }
+    }
+  </style>
+</head>
+<body class="body" style="word-spacing:normal;margin:0;padding:0;background-color:#ffffff;"><!-- PAGE COLOR (1 of 2) -->
+  <custom name="opencounter" type="tracking"/>
+  <custom name="usermatch" type="tracking" />
+  <!-- PAGE COLOR (2 of 2) -->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#ffffff" style="width:100%;background-color:#ffffff;border-collapse:collapse;">
+    <tr>
+      <td align="center" valign="top">
+        <!--[if mso]>
+        <table role="presentation" align="center" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+        <tr>
+        <td width="600" align="center" valign="top" style="width:600px;">
+        <![endif]-->
+        <!-- The column is transparent, so EzBuilder's section colors show as built. Default font and text color match the EzBuilder canvas. -->
+        <table role="presentation" class="email-shell" cellpadding="0" cellspacing="0" border="0" align="center" width="600" style="width:600px;max-width:600px;border-collapse:collapse;margin:0 auto;">
+          <tr>
+            <td align="left" valign="top" style="text-align:left;font-family:Arial, Helvetica, sans-serif;color:#2c2e35;">
+              <div data-type="slot" data-key="bodycontent" data-allowed-blocks="textblock; imageblock; buttonblock; htmlblock; dynamicblock; enhanceddynamicblock" data-label="Drop an HTML block here and paste EzBuilder Copy body"></div>
+            </td>
+          </tr>
+        </table>
+        <!--[if mso]>
+        </td>
+        </tr>
+        </table>
+        <![endif]-->
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

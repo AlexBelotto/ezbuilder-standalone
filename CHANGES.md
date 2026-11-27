@@ -1,3 +1,28 @@
+# Salesforce Marketing Cloud template (27 Nov 2026)
+
+`templates/sfmc-template.html` is the Content Builder template for this version. Paste it
+in Content Builder > Create > Template > Paste HTML, drop one HTML block into Body Content
+and paste EzBuilder's **Copy body** into it. It is kept in this repo and updated with
+EzBuilder.
+
+- Kept from the GrapesJS-era template: both tracking tags, the `bodycontent` slot, the
+  Content Builder wrapper fixes (`.stylingblock-content-wrapper`, `.camarker-inner`), the
+  centered 600px `.email-shell` with its Outlook wrapper, light mode only, and the phone rule
+  that shrinks the column to the screen.
+- Fixed: the old `img { display:block !important }` turned pictures inside text into their
+  own lines; there is no image display rule now. The old
+  `table, td { border-collapse:collapse !important }` squared the corners of rounded boxes
+  (Icon + text, callouts, buttons); the reset no longer uses `!important`.
+- New: on phones, fixed-width boxes (for example a 480px Icon + text) shrink to the screen
+  instead of scrolling sideways; `.nl-vbg` Outlook rule as a fallback for VML backgrounds;
+  Apple data-detector reset; default font and text color match the editor canvas.
+- Removed: duplicated OfficeDocumentSettings/VML blocks, MJML classes (`mj-column-*`,
+  `mj-outlook-group-fix`, `mj-full-width-mobile`), campaign styles (`btn-agendar`, `slogan`,
+  `force-text`, `bg-light`) and the unused Ubuntu web font.
+- Tests: 19 checks render a real Copy body (VML hero, rounded 480px Icon + text, inline image,
+  horizontal spacer, social group with 20px spacing, button, divider) inside the template with
+  Content Builder's wrapper, at 1280px and 375px.
+
 # Hex colors without "#" (27 Nov 2026)
 
 Like the GrapesJS version, every color field (Font, Background and Border color, page
