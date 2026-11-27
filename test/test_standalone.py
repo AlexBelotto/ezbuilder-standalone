@@ -1210,6 +1210,89 @@ def t_assets(a):
   a.pg.click('#ez-modal-x'); a.wait(100)
   check('no errors in the image browser', not a.errors, a.errors)
 
+def color_type(a, panel, name, text, mode='type', commit='Tab'):
+  f = a.field(panel, name); f.scroll_into_view_if_needed(); f.click(); f.fill(''); a.wait(30)
+  mids = []
+  if mode == 'type':
+    for ch in text:
+      f.press(ch if ch != ' ' else 'Space'); a.wait(25); mids.append(f.input_value())
+  else:
+    a.ev("([p,n,t])=>{const f=document.querySelector('#ez-panel-'+p+' [data-ez-field=\"'+n+'\"]'); const dt=new DataTransfer(); dt.setData('text/plain', t); f.focus(); f.select(); f.dispatchEvent(new ClipboardEvent('paste',{clipboardData:dt,bubbles:true,cancelable:true}))}", [panel, name, text])
+    a.pg.keyboard.insert_text(text) if False else None
+    a.ev("([p,n,t])=>{const f=document.querySelector('#ez-panel-'+p+' [data-ez-field=\"'+n+'\"]'); f.value=t; f.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertFromPaste',data:t}))}", [panel, name, text])
+    a.wait(60); mids.append(f.input_value())
+  live = f.input_value()
+  if commit: f.press(commit); a.wait(120)
+  swatch = a.ev("([p,n])=>{const f=document.querySelector('#ez-panel-'+p+' [data-ez-field=\"'+n+'\"]'); const c=f && f.parentElement.querySelector('input[type=color]'); return c ? c.value : null}", [panel, name])
+  # the panel may repaint after a commit; read the field again
+  try: final = a.field(panel, name).input_value()
+  except Exception: final = None
+  return {'mids': mids, 'live': live, 'final': final, 'swatch': swatch}
+
+def t_colors(a):
+  a.clear(); a.ev("()=>EzApp._.forget()")
+  a.build('<table data-nl="section" width="100%"><tr><td data-probe="cell"><p data-probe="p">Colors</p></td></tr></table>')
+  sel_q(a, '[data-probe=p]'); a.tab('edit')
+  r = color_type(a, 'edit', 'color', 'ffffff')
+  check('typing ffffff (no #) in Font color becomes #ffffff', r['final'] == '#ffffff' and r['swatch'] == '#ffffff', r)
+  check('the # is added only once the 6 digits are complete', r['mids'][:5] == ['f', 'ff', 'fff', 'ffff', 'fffff'] and r['mids'][5] == '#ffffff', r['mids'])
+  check('the text color is applied', a.fev("()=>document.querySelector('[data-probe=p]').style.color") in ('rgb(255, 255, 255)', '#ffffff'))
+  hist0 = hist(a)['undo']
+  r = color_type(a, 'edit', 'color', 'e11d48', mode='paste')
+  check('pasting e11d48 becomes #e11d48 at once', r['live'] == '#e11d48' and r['final'] == '#e11d48' and r['swatch'] == '#e11d48', r)
+  check('pasted color applied to the text', a.fev("()=>document.querySelector('[data-probe=p]').style.color") == 'rgb(225, 29, 72)')
+  r = color_type(a, 'edit', 'color', 'f0a', commit='Enter')
+  check('a 3-digit f0a waits while typing and becomes #f0a on Enter', r['mids'] == ['f', 'f0', 'f0a'] and r['final'] == '#f0a' and r['swatch'] == '#ff00aa', r)
+  check('#f0a is applied as #ff00aa', a.fev("()=>document.querySelector('[data-probe=p]').style.color") == 'rgb(255, 0, 170)')
+  r = color_type(a, 'edit', 'color', '  11223380 ', mode='paste')
+  check('an 8-digit code with spaces is cleaned to #11223380 (applied without alpha for Outlook)', r['final'] == '#11223380' and a.fev("()=>document.querySelector('[data-probe=p]').style.color") == 'rgb(17, 34, 51)', r)
+  r = color_type(a, 'edit', 'color', 'red')
+  check('named colors still work (red)', r['final'] == 'red' and a.fev("()=>document.querySelector('[data-probe=p]').style.color") in ('red', 'rgb(255, 0, 0)'), r)
+  r = color_type(a, 'edit', 'color', 'rgb(1, 2, 3)', mode='paste')
+  check('rgb() still works', r['final'] == 'rgb(1, 2, 3)' and a.fev("()=>document.querySelector('[data-probe=p]').style.color") == 'rgb(1, 2, 3)', r)
+  r = color_type(a, 'edit', 'color', '#00aa00')
+  check('a code with # still works untouched', r['final'] == '#00aa00' and a.fev("()=>document.querySelector('[data-probe=p]').style.color") == 'rgb(0, 170, 0)', r)
+  r = color_type(a, 'edit', 'color', 'zzz')
+  check('text that is not a color is left alone and never written', r['final'] == 'zzz' and 'zzz' not in (a.fev("()=>document.querySelector('[data-probe=p]').getAttribute('style')") or ''), r)
+  # background + border
+  sel_q(a, '[data-probe=cell]'); a.tab('edit')
+  r = color_type(a, 'edit', 'background', 'e11d48')
+  cell = a.fev("()=>{const c=document.querySelector('[data-probe=cell]'); return [c.style.backgroundColor, c.getAttribute('bgcolor')]}")
+  check('Background color: e11d48 → #e11d48 on the cell and its bgcolor', r['final'] == '#e11d48' and cell[0] == 'rgb(225, 29, 72)' and (cell[1] or '').lower() == '#e11d48', (r, cell))
+  r = color_type(a, 'edit', 'background', 'transparent')
+  check('Background color: transparent clears the fill', r['final'] == 'transparent' and not a.fev("()=>document.querySelector('[data-probe=cell]').getAttribute('bgcolor')"), (r, a.fev("()=>document.querySelector('[data-probe=cell]').outerHTML.slice(0,200)")))
+  a.set_field('edit', 'border-width', '2px')
+  r = color_type(a, 'edit', 'border-color', '0b57d0')
+  bs = a.fev("()=>document.querySelector('[data-probe=cell]').getAttribute('style')||''").replace(' ', '')
+  check('Border color: 0b57d0 → #0b57d0 on the border', r['final'] == '#0b57d0' and '#0b57d0' in bs, (r, bs))
+  h = a.export()
+  check('export carries the # hex colors', 'border:2px solid #0b57d0' in h.replace(': ', ':'), h[h.find('Colors') - 300:][:300])
+  # Settings fields
+  a.clear(); a.ev("()=>EzApp.add('divider',{quiet:true})"); sel_q(a, '[data-ez=divider]'); a.tab('config')
+  r = color_type(a, 'config', 'divider-color', 'ff8800')
+  check('Divider line color: ff8800 → #ff8800', r['final'] == '#ff8800' and '#ff8800' in a.export(), r)
+  r = color_type(a, 'config', 'divider-color', 'f0a', commit='Tab')
+  check('Divider line color: f0a → #f0a on blur', r['final'] == '#f0a' and '#ff00aa' in a.export(), r)
+  a.clear(); a.ev("()=>EzApp.add('button',{quiet:true})"); sel_q(a, '[data-ez=button], table[data-ez=button]')
+  sel = a.selected() or {}
+  a.tab('edit')
+  r = color_type(a, 'edit', 'background', '123abc')
+  check('Button background: 123abc → #123abc in the export', r['final'] == '#123abc' and '#123abc' in a.export(), (sel, r))
+  a.ev("(b)=>EzApp.add(b,{quiet:true})", 'sect50'); a.wait(100)
+  a.ev("()=>{const d=EzApp.frame().contentDocument; EzApp.select([...d.querySelectorAll('table[data-nl=section]')].pop().querySelector('td'))}")
+  a.ev("()=>EzApp.add('email-hspacer')"); a.wait(150)
+  if a.fev("()=>!!document.querySelector('[data-nl=hspacer]')"):
+    sel_q(a, '[data-nl=hspacer]'); a.tab('config')
+    r = color_type(a, 'config', 'gap-bg', 'abcdef')
+    check('Horizontal spacer background: abcdef → #abcdef', r['final'] == '#abcdef' and '#abcdef' in a.fev("()=>document.querySelector('[data-nl=hspacer]').outerHTML"), r)
+  else: check('horizontal spacer added for the color test', False)
+  # page background (body settings)
+  a.ev("()=>EzApp.select(null)"); a.tab('edit')
+  if a.pg.locator('#ez-panel-edit [data-ez-field="page-color"]').count():
+    r = color_type(a, 'edit', 'page-color', 'f4f4f4')
+    check('Page background: f4f4f4 → #f4f4f4 in the export', r['final'] == '#f4f4f4' and '#f4f4f4' in a.export(), r)
+  check('no errors in color fields', not a.errors, a.errors)
+
 def main():
   with sync_playwright() as p:
     b = p.chromium.launch()
@@ -1218,7 +1301,7 @@ def main():
     t_startup(b, srv)
     a = App(b, url)
     for fn in (t_catalog, t_toolbar, t_blocks, t_dnd, t_selection, t_layers, t_rte, t_style, t_settings, t_views, t_io,
-               t_resize, t_canvas_ui, t_keyboard, t_inspector_v2, t_check, t_messy, t_reliability, t_assets):
+               t_resize, t_canvas_ui, t_keyboard, t_inspector_v2, t_check, t_messy, t_reliability, t_assets, t_colors):
       try:
         a.errors.clear(); fn(a)
       except Exception as e:

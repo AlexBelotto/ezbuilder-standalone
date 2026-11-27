@@ -1,3 +1,21 @@
+# Hex colors without "#" (27 Nov 2026)
+
+Like the GrapesJS version, every color field (Font, Background and Border color, page
+colors, divider line, horizontal spacer, social plate and button backgrounds) accepts a hex
+code typed or pasted without "#".
+
+- `ffffff` and `11223380` get their "#" as soon as the 6 or 8 digits are complete; the caret
+  stays where it was. `fff` / `f0a` / `ffff` wait (they may still be on their way to six
+  digits) and get the "#" on Enter, Tab or leaving the field. A pasted code is fixed at once.
+  Spaces around the code are dropped.
+- The color square, the element and the export update together. 8-digit and 4-digit codes
+  keep their text, but the email gets the color without transparency (Outlook has none).
+- Names (`red`, `white`), `rgb()`, `hsl()` and codes that already have "#" work as before;
+  `transparent`, `inherit` and `none` clear the color. Half-typed codes and text that is not a
+  color are never written into the email.
+- Tests: 22 new checks (typing letter by letter, paste, 3/6/8 digits, names, rgb, Font,
+  Background and Border color, divider, button, horizontal spacer, page background, export).
+
 # Image browser upgrade (27 Nov 2026)
 
 The Select Image dialog had no stylesheet rules for its address field or cards, so the

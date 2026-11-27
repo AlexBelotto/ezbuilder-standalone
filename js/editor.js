@@ -218,6 +218,41 @@
     return '#' + bite(rgb[1]) + bite(rgb[2]) + bite(rgb[3]);
   }
 
+  // What a color field passes on: a hex code (alpha dropped, Outlook has none),
+  // rgb() as typed, a name or hsl() turned into hex, '' to clear, or null while
+  // the text is not a color yet.
+  var colorProbe = null;
+  function colorValue(input) {
+    var raw = String(input == null ? '' : input).trim();
+    if (!raw) return '';
+    var bare = raw.match(/^#?([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+    if (bare) {
+      var h = bare[1].toLowerCase();
+      if (h.length === 4) h = h.slice(0, 3);
+      if (h.length === 8) h = h.slice(0, 6);
+      return '#' + h;
+    }
+    if (/^#/.test(raw)) return null;
+    if (/^rgba?\(/i.test(raw)) {
+      if (!normalizeColor(raw)) return null;
+      var alpha = raw.match(/^rgba\([^)]*,\s*([\d.]+)\s*\)$/i);
+      return alpha && parseFloat(alpha[1]) === 0 ? '' : raw;
+    }
+    if (/^(transparent|none|inherit|initial|unset|revert|currentcolor)$/i.test(raw)) return '';
+    if (!colorProbe) {
+      colorProbe = document.createElement('span');
+      colorProbe.style.display = 'none';
+      document.body.appendChild(colorProbe);
+    }
+    colorProbe.style.color = '';
+    colorProbe.style.color = raw;
+    if (!colorProbe.style.color) return null;
+    var out = normalizeColor(window.getComputedStyle(colorProbe).color);
+    var a = window.getComputedStyle(colorProbe).color.match(/rgba\([^)]*,\s*([\d.]+)\s*\)/i);
+    if (a && parseFloat(a[1]) === 0) return '';
+    return out || null;
+  }
+
   function escapeStyle(css) {
     return String(css || '').replace(/<\/style/gi, '<\\/style');
   }
@@ -1283,10 +1318,56 @@
     color.type = 'color';
     color.value = normalizeColor(value) || '#ffffff';
     color.title = label;
-    watch(text, function (raw) {
-      var hex = normalizeColor(raw);
+    // Hex codes can be typed without "#": ffffff, fff, e11d48, 11223380. A
+    // complete 6 or 8 digit code gets its "#" as you type (the caret stays put);
+    // 3 and 4 digit codes get it on Enter, Tab or leaving the field, because
+    // "fff" may still be on its way to "ffffff". Names, rgb() and hsl() work too.
+    function push(raw) {
+      var value = colorValue(raw);
+      if (value === null) return false;
+      var hex = normalizeColor(value);
       if (hex) color.value = hex;
-      apply(raw);
+      apply(value);
+      changed();
+      return true;
+    }
+    arm(text);
+    text.addEventListener('input', function (event) {
+      var raw = text.value;
+      var bare = raw.trim().match(/^#?([0-9a-f]+)$/i);
+      if (bare && raw.trim().charAt(0) !== '#') {
+        var digits = bare[1];
+        var pasted = event && event.inputType === 'insertFromPaste';
+        if (digits.length === 6 || digits.length === 8 || (pasted && (digits.length === 3 || digits.length === 4))) {
+          var caret = text.selectionStart;
+          var lead = raw.length - raw.replace(/^\s+/, '').length;
+          text.value = '#' + digits.toLowerCase();
+          if (caret != null && document.activeElement === text) {
+            var at = Math.max(1, Math.min(text.value.length, caret - lead + 1));
+            try { text.setSelectionRange(at, at); } catch (err) {}
+          }
+          push(text.value);
+        }
+        return;
+      }
+      // "#ff" or "#fffff" are still being typed; only apply complete codes.
+      if (/^#[0-9a-f]*$/i.test(raw.trim()) && !/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(raw.trim())) return;
+      push(raw);
+    });
+    text.addEventListener('change', function () {
+      var raw = text.value.trim();
+      if (/^([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(raw)) raw = '#' + raw.toLowerCase();
+      if (raw !== text.value) text.value = raw;
+      push(raw);
+    });
+    text.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        var raw = text.value.trim();
+        if (/^([0-9a-f]{3}|[0-9a-f]{4})$/i.test(raw)) {
+          text.value = '#' + raw.toLowerCase();
+          push(text.value);
+        }
+      }
     });
     watch(color, function (raw) {
       text.value = raw;
