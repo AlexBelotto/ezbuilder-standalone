@@ -1372,3 +1372,20 @@ button.ez-issue.is-on { background: var(--nl-primary-soft); box-shadow: inset 3p
   border: 1px solid var(--nl-outline-variant);
 }
 .nl-btn.secondary:hover { background: var(--nl-primary-soft); }
+
+/* Color fields: the code box and the picker share one full-width row, and the
+   swatches wrap on their own row below. In Settings the field row used to put
+   all three side by side, which squeezed the code box to a few pixels. */
+#ez-panel-config .ez-field.ez-wide { flex-wrap: wrap; }
+#ez-panel-config .ez-field > .ez-swatches {
+  flex: 0 0 100%;
+  margin-top: 0;
+  padding-left: calc(38% + 8px);
+  box-sizing: border-box;
+}
+.ez-color-field > input.ez-input { flex: 1 1 auto; min-width: 0; width: auto; }
+.ez-swatch.ez-swatch-none {
+  background:
+    linear-gradient(135deg, transparent calc(50% - 1px), #d93025 calc(50% - 1px), #d93025 calc(50% + 1px), transparent calc(50% + 1px)),
+    #ffffff !important;
+}

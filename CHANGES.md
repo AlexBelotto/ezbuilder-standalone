@@ -1,3 +1,10 @@
+# Fixes: color fields, Old Outlook line color, button corners (27 Nov 2026)
+
+- **Settings color fields** (social icon background, spacer background, divider line color): the code box, the picker and the recent-color swatches all sat on one row, which squeezed the code box to about 16px so you could not type in it. Now the code box and picker share one full-width row and the swatches wrap on their own row below. Fill fields (social, spacer, background, page) accept `transparent` in any case. It clears the fill, and there is a new "transparent" swatch, the white chip with a red slash. Their empty placeholder reads "transparent".
+- **Old Outlook text color:** a line aligned on its own gets an Outlook-only table so Word honors the alignment. That table did not inherit the block's color or font, so after a whole-block color change that line turned black in Old Outlook. The Outlook copy now carries the inherited color, font, size and weight on its cell and `<font>`. Spans with their own color keep it.
+- **Button corners:** a button is a table, a cell and a link. With the cell or link selected, radius, fill and border were written to that part only, which left a second shape behind the button. Radius now goes to all three, and fill to the cell and link, whichever part is selected. A button border goes on the link, which the Outlook copy also reads, and is removed from the table and cell.
+- Tests: `t_fixes55` (32 checks). Full suite 443/443.
+
 # Salesforce Marketing Cloud template (27 Nov 2026)
 
 `templates/sfmc-template.html` is the Content Builder template for this version. Paste it

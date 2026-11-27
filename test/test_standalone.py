@@ -1293,6 +1293,79 @@ def t_colors(a):
     check('Page background: f4f4f4 → #f4f4f4 in the export', r['final'] == '#f4f4f4' and '#f4f4f4' in a.export(), r)
   check('no errors in color fields', not a.errors, a.errors)
 
+def t_fixes55(a):
+  # 1. Settings color fields: code box wide, swatches on their own row, transparent works
+  a.clear(); a.ev("()=>EzApp._.forget()")
+  for k in ['email-hero', 'email-social-group', 'divider']: a.ev("(b)=>EzApp.add(b,{quiet:true})", k)
+  a.ev("(b)=>EzApp.add(b,{quiet:true})", 'sect50'); a.wait(100)
+  a.ev("()=>{const d=EzApp.frame().contentDocument; EzApp.select([...d.querySelectorAll('table[data-nl=section]')].pop().querySelector('td'))}")
+  a.ev("()=>EzApp.add('email-hspacer')"); a.wait(150)
+  M = "e=>{const w=e.closest('.ez-field');const s=w.querySelector('.ez-swatches');const r=e.getBoundingClientRect();const c=e.parentElement.querySelector('input[type=color]').getBoundingClientRect();return {w:r.width, top:r.top, bottom:r.bottom, ctop:c.top, sw:s?s.getBoundingClientRect().top:null, none:!!(s&&s.querySelector('.ez-swatch-none'))}}"
+  for sel, name in [('[data-nl=social-element]', 'social-bg'), ('[data-ez=divider]', 'divider-color'), ('[data-nl=hspacer]', 'gap-bg')]:
+    sel_q(a, sel); a.tab('config'); a.wait(120)
+    f = a.field('config', name); f.scroll_into_view_if_needed()
+    m = f.evaluate(M)
+    check('Settings %s: code box is at least 100px wide' % name, m['w'] >= 100, m)
+    check('Settings %s: picker on the same row, swatches on their own row below' % name, abs(m['ctop'] - m['top']) < 6 and (m['sw'] is None or m['sw'] >= m['bottom']), m)
+  sel_q(a, '[data-nl=social-element]'); a.tab('config')
+  check('Social background offers a transparent swatch', a.field('config', 'social-bg').evaluate(M)['none'])
+  plate = "()=>{const c=document.querySelector('[data-nl=social-element] td'); return [c.getAttribute('bgcolor')||'', c.style.backgroundColor||'']}"
+  r = color_type(a, 'config', 'social-bg', 'e11d48')
+  check('Social background: typing e11d48 paints the icon plate #e11d48', a.fev(plate)[0].lower() == '#e11d48' and '#e11d48' in a.export().lower(), (r, a.fev(plate)))
+  r = color_type(a, 'config', 'social-bg', 'Transparent')
+  check('Social background: "Transparent" clears the plate color', a.fev(plate) == ['', ''], (r, a.fev(plate)))
+  h = a.export(); i = h.find('data-nl="social-element"')
+  check('Social background: transparent exports with no bgcolor on the plate', 'e11d48' not in h.lower(), h[i:i+400])
+  r = color_type(a, 'config', 'social-bg', '00ff00')
+  a.ev("()=>{const s=document.querySelector('#ez-panel-config .ez-swatch-none'); s.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); s.click()}"); a.wait(120)
+  check('Social background: the transparent swatch clears it as well', a.fev(plate) == ['', ''], a.fev(plate))
+  sel_q(a, '[data-nl=hspacer]'); a.tab('config')
+  color_type(a, 'config', 'gap-bg', '123456'); color_type(a, 'config', 'gap-bg', 'transparent')
+  check('Spacer background: transparent clears it', '123456' not in a.export(), None)
+
+  # 2. A line aligned on its own keeps the block color in Old Outlook
+  a.clear(); a.ev("()=>EzApp._.forget()")
+  a.build('<div data-ez="text" style="padding:10px;">Line one<div>Line two</div><div>Line three</div></div>')
+  sel_q(a, '[data-ez=text] > div'); a.tab('edit')
+  a.pg.locator('#ez-panel-edit .ez-radios button[title="Center"]').first.click(); a.wait(120)
+  sel_q(a, '[data-ez=text]'); a.tab('edit')
+  color_type(a, 'edit', 'color', 'ffffff')
+  h = a.export()
+  import re as _re
+  mso = _re.findall(r'<!--\[if mso\]>([\s\S]*?)<!\[endif\]-->', h)
+  line = [m for m in mso if 'Line two' in m]
+  check('Aligned line: the Outlook copy carries #ffffff on its cell and <font>', bool(line) and 'color:#ffffff' in line[0].replace(' ', '') and 'color="#ffffff"' in line[0], line[:1])
+  a.pg.locator('#nl-outlook').click(); a.wait(1200)
+  cols = a.pg.evaluate("()=>{const d=document.getElementById('nl-outlook-frame').contentDocument; return [...d.querySelectorAll('font, td, div')].filter(e=>/^Line (one|two|three)$/.test(e.textContent.trim())).map(e=>getComputedStyle(e).color)}")
+  check('Old Outlook preview: every line renders white', cols and all(c == 'rgb(255, 255, 255)' for c in cols), cols)
+  a.pg.locator('#nl-outlook').click(); a.wait(200)
+  a.build('<div data-ez="text" style="padding:10px;color:#222222;font-family:Georgia, serif;">Lead<p style="text-align:right;margin:0">Right <span style="color:#ff0000">red</span></p></div>')
+  h = a.export(); line = [m for m in _re.findall(r'<!--\[if mso\]>([\s\S]*?)<!\[endif\]-->', h) if 'Right' in m]
+  check('Aligned line: inherits color and font in Outlook, an explicitly colored span keeps its own', bool(line) and 'color="#222222"' in line[0] and 'Georgia' in line[0] and 'color:#ff0000' in line[0].replace(' ', ''), line[:1])
+
+  # 3. Button corners stay one shape whichever part is selected
+  R = "()=>{const t=document.querySelector('table[data-ez=button]'),c=t.querySelector('td'),l=t.querySelector('a');return [t.style.borderRadius,c.style.borderRadius,l.style.borderRadius]}"
+  for label, sel in [('table', 'table[data-ez=button]'), ('cell', 'table[data-ez=button] td'), ('link', 'table[data-ez=button] a')]:
+    a.clear(); a.ev("(b)=>EzApp.add(b,{quiet:true})", 'button'); a.wait(80)
+    a.ev("(q)=>EzApp.select(EzApp.frame().contentDocument.querySelector(q))", sel); a.wait(80); a.tab('edit')
+    for side in ['top', 'right', 'bottom', 'left']: a.set_field('edit', 'radius-' + side, '18px')
+    v = a.fev(R)
+    check('Button radius from the %s: table, cell and link all 18px' % label, len(set(v)) == 1 and v[0].replace(' 18px', '') == '18px', v)
+    a.set_field('edit', 'radius-top', '2px'); v = a.fev(R)
+    check('Button radius from the %s: one corner changes on all three' % label, len(set(v)) == 1 and v[0].startswith('2px'), v)
+    h = a.export(); i = h.find('<a href="https://example.com"')
+    check('Button radius from the %s: export keeps the cell and link equal' % label, h.count('border-radius:' + v[0]) >= 3, (v, h[i-400:i+400]))
+    color_type(a, 'edit', 'background', '0b57d0')
+    f = a.fev("()=>{const t=document.querySelector('table[data-ez=button]'),c=t.querySelector('td'),l=t.querySelector('a');return [c.getAttribute('bgcolor'),c.style.backgroundColor,l.style.backgroundColor]}")
+    check('Button fill from the %s: cell and link both #0b57d0' % label, (f[0] or '').lower() == '#0b57d0' and f[1] == f[2] == 'rgb(11, 87, 208)', f)
+    a.set_field('edit', 'border-width', '2px')
+    b = a.fev("()=>{const t=document.querySelector('table[data-ez=button]'),c=t.querySelector('td'),l=t.querySelector('a');return [t.style.border,c.style.border,l.style.border]}")
+    check('Button border from the %s: drawn on the link only, no square box behind' % label, not b[0] and not b[1] and '2px' in b[2], b)
+  a.ev("()=>EzApp.select(EzApp.frame().contentDocument.querySelector('table[data-ez=button] a'))"); a.wait(80); a.tab('edit')
+  check('Button radius field shows the shared value when the link is selected', a.field('edit', 'radius-top').input_value() in ('2px', '2'), a.field('edit', 'radius-top').input_value())
+  h = a.export()
+  check('Button with a border: the Outlook copy carries it', 'mso-border-alt' in h, None)
+
 def t_sfmc(b):
   path = os.path.join(ROOT, 'templates', 'sfmc-template.html')
   check('SFMC template exists in templates/', os.path.exists(path), path)
@@ -1361,7 +1434,7 @@ def main():
     t_startup(b, srv)
     a = App(b, url)
     for fn in (t_catalog, t_toolbar, t_blocks, t_dnd, t_selection, t_layers, t_rte, t_style, t_settings, t_views, t_io,
-               t_resize, t_canvas_ui, t_keyboard, t_inspector_v2, t_check, t_messy, t_reliability, t_assets, t_colors):
+               t_resize, t_canvas_ui, t_keyboard, t_inspector_v2, t_check, t_messy, t_reliability, t_assets, t_colors, t_fixes55):
       try:
         a.errors.clear(); fn(a)
       except Exception as e:

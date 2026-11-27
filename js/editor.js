@@ -469,6 +469,19 @@
     return !!buttonAnchor(cell);
   }
 
+  // A button is a table, its one cell and the link inside. Each can be
+  // selected on its own, and a corner, fill or outline written to only one of
+  // them left the others showing behind it. They are edited as one button.
+  function buttonOf(el) {
+    if (!el || !el.tagName) return null;
+    if (isButtonTable(el)) return el;
+    if (el.tagName !== 'TD' && el.tagName !== 'TH' && el.tagName !== 'A') return null;
+    var table = el.parentElement && el.parentElement.closest ? el.parentElement.closest('table') : null;
+    if (!table || !isButtonTable(table)) return null;
+    var cell = allCells(table)[0];
+    return (el === cell || el === buttonAnchor(cell)) ? table : null;
+  }
+
   function pctOf(cell) {
     var raw = String(decl(cell, 'width') || cell.getAttribute('width') || '').trim();
     var match = raw.match(/^(\d+(?:\.\d+)?)%$/);
@@ -1312,7 +1325,11 @@
     text.type = 'text';
     text.className = 'ez-input';
     text.value = value || '';
-    text.placeholder = '#000000';
+    // A fill can be left empty, which is transparent; typing "transparent" clears it too.
+    var fill = /^(background|social-bg|gap-bg|page-color)$/.test(name);
+    text.placeholder = fill ? 'transparent' : '#000000';
+    text.spellcheck = false;
+    text.autocomplete = 'off';
     text.setAttribute('data-ez-field', name);
     var color = document.createElement('input');
     color.type = 'color';
@@ -1378,9 +1395,24 @@
     wrap.appendChild(box);
     // Colors already used in this email, one click away.
     var used = documentColors();
-    if (used.length) {
+    if (used.length || fill) {
       var row = document.createElement('div');
       row.className = 'ez-swatches';
+      if (fill) {
+        var none = document.createElement('button');
+        none.type = 'button';
+        none.className = 'ez-swatch ez-swatch-none';
+        none.title = 'Transparent';
+        none.setAttribute('aria-label', 'No fill (transparent)');
+        none.addEventListener('mousedown', function () { if (!armed) { snapshot(); armed = true; } });
+        none.addEventListener('click', function () {
+          armed = false;
+          text.value = 'transparent';
+          apply('');
+          changed();
+        });
+        row.appendChild(none);
+      }
       used.forEach(function (hex) {
         var chip = document.createElement('button');
         chip.type = 'button';
@@ -2636,8 +2668,8 @@
   }
 
   function readFill(el) {
-    if (isButtonTable(el)) {
-      var cell = allCells(el)[0];
+    if (buttonOf(el)) {
+      var cell = allCells(buttonOf(el))[0];
       return (cell && (cell.getAttribute('bgcolor') || decl(cell, 'background-color'))) || '';
     }
     if (el.getAttribute('data-nl') === 'social-element') {
@@ -2651,8 +2683,8 @@
 
   // Button color stays on the button cell and its link. A gap keeps its width.
   function writeFill(el, color) {
-    if (isButtonTable(el)) {
-      paintButtonColor(el, color);
+    if (buttonOf(el)) {
+      paintButtonColor(buttonOf(el), color);
       return;
     }
     if (el.getAttribute('data-nl') === 'social-element') {
@@ -2700,9 +2732,11 @@
 
   function writeRadius(el, value) {
     var v = String(value || '').trim();
-    if (isButtonTable(el)) {
-      var cell = allCells(el)[0];
+    var button = buttonOf(el);
+    if (button) {
+      var cell = allCells(button)[0];
       var link = cell && buttonAnchor(cell);
+      setDecl(button, 'border-radius', v);
       if (cell) setDecl(cell, 'border-radius', v);
       if (link) setDecl(link, 'border-radius', v);
       return;
@@ -2849,9 +2883,25 @@
     };
   }
 
+  // A button's outline goes on its link, which the Outlook copy also reads.
+  // A border on the table or cell drew a square box behind the rounded button.
+  function buttonBorderHost(el) {
+    var button = buttonOf(el);
+    if (!button) return null;
+    var cell = allCells(button)[0];
+    return (cell && buttonAnchor(cell)) || null;
+  }
+
   function writeBorder(el, parts) {
     var divider = el.getAttribute('data-ez') === 'divider';
     var host = divider ? (el.querySelector('td') || el) : el;
+    var link = buttonBorderHost(el);
+    if (link) {
+      var button = buttonOf(el);
+      setDecl(button, 'border', '');
+      if (allCells(button)[0]) setDecl(allCells(button)[0], 'border', '');
+      host = link;
+    }
     var prop = divider ? 'border-top' : 'border';
     var width = String(parts.width || '').trim();
     var style = String(parts.style || '').trim();
@@ -2867,7 +2917,7 @@
     var fields = [
       colorField('Background color', readFill(el), 'background', function (value) { writeFill(el, value); })
     ];
-    var radiusHost = isButtonTable(el) ? (allCells(el)[0] || el) : el;
+    var radiusHost = buttonOf(el) ? (allCells(buttonOf(el))[0] || el) : el;
     var radius = boxSides(radiusHost, 'border-radius');
     fields.push(sidesField('Border radius', 'radius', radius, function (sides) {
       var values = ['top', 'right', 'bottom', 'left'].map(function (side) { return String(sides[side] || '').trim(); });
@@ -2879,7 +2929,7 @@
       }));
     }
     var borderHost = el.getAttribute('data-ez') === 'divider' ? (el.querySelector('td') || el) : el;
-    var borderValue = el.getAttribute('data-ez') === 'divider' ? (decl(borderHost, 'border-top') || '') : (decl(el, 'border') || '');
+    var borderValue = el.getAttribute('data-ez') === 'divider' ? (decl(borderHost, 'border-top') || '') : (decl(buttonBorderHost(el) || el, 'border') || decl(el, 'border') || '');
     var parts = borderParts(borderValue);
     fields.push(unitField('Border width', parts.width, 'border-width', function (value) {
       parts.width = value;

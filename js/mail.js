@@ -1857,6 +1857,28 @@
     });
   }
 
+  // The typography a line inherits in a browser, read from the inline styles
+  // and <font> tags of its ancestors, nearest first.
+  function inheritedType(node) {
+    var found = { color: '', face: '', size: '', weight: '' };
+    while (node && node.nodeType === 1 && node.id !== 'nl-root' && node.tagName !== 'BODY') {
+      var style = styleMap(node.getAttribute('style'));
+      if (!found.color) {
+        found.color = toHex(style.color || '') ||
+          (node.tagName === 'FONT' ? toHex(node.getAttribute('color') || '') : '');
+      }
+      if (!found.face) {
+        found.face = styleFace(style['font-family'] || '') ||
+          (node.tagName === 'FONT' ? styleFace(node.getAttribute('face') || '') : '');
+      }
+      if (!found.size && /^\d+(\.\d+)?(px|pt)$/i.test(String(style['font-size'] || '').trim())) found.size = style['font-size'];
+      if (!found.weight && style['font-weight']) found.weight = style['font-weight'];
+      if (found.color && found.face && found.size && found.weight) break;
+      node = node.parentElement;
+    }
+    return found;
+  }
+
   // Word drops margin and color on a div, and ignores text-align unless the cell has align.
   function outlookText(root) {
     Array.prototype.slice.call(root.querySelectorAll('div, p, h1, h2, h3, h4, h5, h6')).forEach(function (el) {
@@ -1881,6 +1903,14 @@
       var weight = style['font-weight'] || '';
       var needs = top || bottom || color || align !== 'left' || sidePx(boxSides(pad).top) || sidePx(boxSides(pad).left);
       if (!needs) return;
+      // The Outlook copy sits in its own table, and Word does not carry the
+      // color or font of the text block around it into that table. A line that
+      // was aligned on its own then turned black after a color change on the block.
+      var inherited = inheritedType(el.parentElement);
+      color = color || inherited.color;
+      face = face || inherited.face;
+      size = size || inherited.size;
+      weight = weight || inherited.weight;
       var width = Math.min(EMAIL_WIDTH, elementWidth(el));
       // Word doubles the inset when a cell sets both padding and mso-padding-alt.
       var tdStyle = '';
