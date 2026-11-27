@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EzBuilder</title>
+    <script>
+      (function () {
+        var saved = '';
+        try { saved = localStorage.getItem('newsletter-project-theme') || ''; } catch (err) { saved = ''; }
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (saved === 'dark' || (saved !== 'light' && prefersDark)) {
+          document.documentElement.setAttribute('data-nl-theme', 'dark');
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="./css/app.css">
+  </head>
+  <body>
+    <div id="app">
+      <div id="nl-toolbar">
+        <div class="brand">
+          <span class="mark"></span>
+          <span class="name">EzBuilder</span>
+          <span class="width">600px</span>
+        </div>
+        <button type="button" id="nl-paste">Paste HTML</button>
+        <button type="button" id="nl-copy">Copy HTML</button>
+        <button type="button" id="nl-copy-body" class="secondary">Copy body</button>
+        <button type="button" id="nl-save" class="secondary" title="Save the selection as one My block. Ctrl+click to select more than one.">Save selected as block</button>
+        <button type="button" id="nl-mine" class="secondary">My blocks</button>
+        <button type="button" id="nl-outlook" class="secondary" aria-pressed="false" aria-controls="nl-outlook-pane" title="Side preview of the Old Outlook copy of this email. Buttons are square. Copy body is unchanged.">Old Outlook</button>
+        <button type="button" id="nl-theme" class="secondary" aria-pressed="false" title="Dark mode for the editor. The email page stays white.">Dark mode</button>
+        <div class="nl-doc" title="Written into the head of Copy HTML. Paste HTML fills these in from the pasted email.">
+          <label for="nl-email-title">Title</label>
+          <input type="text" id="nl-email-title" class="nl-field" placeholder="Newsletter" maxlength="150" spellcheck="false">
+          <label for="nl-email-lang">Lang</label>
+          <select id="nl-email-lang" class="nl-field">
+            <option value="en">en</option>
+            <option value="es">es</option>
+            <option value="pt">pt</option>
+            <option value="fr">fr</option>
+            <option value="de">de</option>
+            <option value="it">it</option>
+            <option value="nl">nl</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <input type="text" id="nl-email-lang-custom" class="nl-field" placeholder="es-MX" maxlength="20" spellcheck="false" aria-label="Custom language code" hidden>
+        </div>
+        <span class="hint">Blocks sit in the 600px column. Paste HTML, edit, then copy the HTML out.</span>
+      </div>
+      <div id="nl-workspace">
+        <div id="ez-editor">
+          <div id="ez-commands">
+            <div id="ez-devices" role="toolbar" aria-label="Screen width">
+              <button type="button" data-device="Desktop" title="Desktop"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2Z"/></svg></button>
+              <button type="button" data-device="Tablet" title="Tablet"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19,18H5V6H19M21,4H3C1.89,4 1,4.89 1,6V18A2,2 0 0,0 3,20H21A2,2 0 0,0 23,18V6C23,4.89 22.1,4 21,4Z"/></svg></button>
+              <button type="button" data-device="Mobile landscape" title="Mobile landscape"><svg viewBox="0 0 24 24"><path fill="currentColor" transform="rotate(90 12 12)" d="M17,19H7V5H17M17,1H7C5.89,1 5,1.89 5,3V21A2,2 0 0,0 7,23H17A2,2 0 0,0 19,21V3C19,1.89 18.1,1 17,1Z"/></svg></button>
+              <button type="button" data-device="Mobile portrait" title="Mobile portrait"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M17,19H7V5H17M17,1H7C5.89,1 5,1.89 5,3V21A2,2 0 0,0 7,23H17A2,2 0 0,0 19,21V3C19,1.89 18.1,1 17,1Z"/></svg></button>
+            </div>
+            <span id="ez-status" role="status"></span>
+          </div>
+          <div id="ez-options" role="toolbar" aria-label="Editor commands">
+            <button type="button" id="ez-outlines" title="View components" aria-pressed="false"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15,5H17V3H15M15,21H17V19H15M11,5H13V3H11M19,5H21V3H19M19,9H21V7H19M19,21H21V19H19M19,13H21V11H19M19,17H21V15H19M3,5H5V3H3M3,9H5V7H3M3,13H5V11H3M3,17H5V15H3M3,21H5V19H3M11,21H13V19H11M7,21H9V19H7M7,5H9V3H7V5Z"/></svg></button>
+            <button type="button" id="ez-preview" title="Preview" aria-pressed="false"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z"/></svg></button>
+            <button type="button" id="ez-fullscreen" title="Fullscreen" aria-pressed="false"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M5,5H10V7H7V10H5V5M14,5H19V10H17V7H14V5M17,14H19V19H14V17H17V14M10,17V19H5V14H7V17H10Z"/></svg></button>
+            <button type="button" id="ez-code" title="Copy HTML"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M14.6,16.6L19.2,12L14.6,7.4L16,6L22,12L16,18L14.6,16.6M9.4,16.6L4.8,12L9.4,7.4L8,6L2,12L8,18L9.4,16.6Z"/></svg></button>
+            <button type="button" id="ez-import" title="Paste HTML"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"/></svg></button>
+            <button type="button" id="ez-images" title="Toggle images" aria-pressed="false"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M21 17.2L6.8 3H19C20.1 3 21 3.9 21 5V17.2M20.7 22L19.7 21H5C3.9 21 3 20.1 3 19V4.3L2 3.3L3.3 2L22 20.7L20.7 22M16.8 18L12.9 14.1L11 16.5L8.5 13.5L5 18H16.8Z"/></svg></button>
+            <span class="ez-opt-sep" aria-hidden="true"></span>
+            <button type="button" id="ez-quick" title="Quick insert (Ctrl+K)" aria-haspopup="dialog"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/></svg></button>
+            <button type="button" id="ez-check" title="Email check" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M10,17L6,13L7.41,11.59L10,14.17L16.59,7.58L18,9L10,17Z"/></svg><span class="ez-count" id="ez-check-count" hidden></span></button>
+            <button type="button" id="ez-keys" title="Keyboard shortcuts (?)" aria-haspopup="dialog"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19,10H17V8H19M19,13H17V11H19M16,10H14V8H16M16,13H14V11H16M16,17H8V15H16M7,10H5V8H7M7,13H5V11H7M8,11H10V13H8M8,8H10V10H8M11,11H13V13H11M11,8H13V10H11M20,5H4C2.89,5 2,5.89 2,7V17A2,2 0 0,0 4,19H20A2,2 0 0,0 22,17V7C22,5.89 21.1,5 20,5Z"/></svg></button>
+            <span class="ez-opt-sep" aria-hidden="true"></span>
+            <button type="button" id="ez-undo" title="Undo"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M20 13.5C20 17.09 17.09 20 13.5 20H6V18H13.5C16 18 18 16 18 13.5S16 9 13.5 9H7.83L10.91 12.09L9.5 13.5L4 8L9.5 2.5L10.92 3.91L7.83 7H13.5C17.09 7 20 9.91 20 13.5Z"/></svg></button>
+            <button type="button" id="ez-redo" title="Redo"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M10.5 18H18V20H10.5C6.91 20 4 17.09 4 13.5S6.91 7 10.5 7H16.17L13.08 3.91L14.5 2.5L20 8L14.5 13.5L13.09 12.09L16.17 9H10.5C8 9 6 11 6 13.5S8 18 10.5 18Z"/></svg></button>
+            <button type="button" id="ez-clear" title="Clear canvas"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/></svg></button>
+          </div>
+          <div id="ez-views" role="tablist" aria-label="Block details">
+            <button type="button" id="ez-tab-edit" data-tab="edit" role="tab" aria-controls="ez-panel-edit" title="Edit"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M20.71,4.63L19.37,3.29C19,2.9 18.35,2.9 17.96,3.29L9,12.25L11.75,15L20.71,6.04C21.1,5.65 21.1,5 20.71,4.63M7,14A3,3 0 0,0 4,17C4,18.31 2.84,19 2,19C2.92,20.22 4.5,21 6,21A4,4 0 0,0 10,17A3,3 0 0,0 7,14Z"/></svg></button>
+            <button type="button" id="ez-tab-config" data-tab="config" role="tab" aria-controls="ez-panel-config" title="Config"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/></svg></button>
+            <button type="button" id="ez-tab-layers" data-tab="layers" role="tab" aria-controls="ez-panel-layers" title="Layers"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,16L19.36,10.27L21,9L12,2L3,9L4.63,10.27M12,18.54L4.62,12.81L3,14.07L12,21.07L21,14.07L19.37,12.8L12,18.54Z"/></svg></button>
+            <button type="button" id="ez-tab-blocks" data-tab="blocks" class="is-on" role="tab" aria-controls="ez-panel-blocks" title="Blocks"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M17,13H13V17H11V13H7V11H11V7H13V11H17M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3Z"/></svg></button>
+          </div>
+          <div id="ez-views-body">
+            <div id="ez-panel-edit" class="ez-panel" role="tabpanel" hidden></div>
+            <div id="ez-panel-config" class="ez-panel" role="tabpanel" hidden></div>
+            <div id="ez-panel-layers" class="ez-panel" role="tabpanel" hidden></div>
+            <div id="ez-panel-blocks" class="ez-panel" role="tabpanel"></div>
+          </div>
+          <button type="button" id="ez-preview-off" title="Exit preview (Esc)" aria-label="Exit preview" hidden><svg viewBox="0 0 24 24"><path fill="currentColor" d="M11.83,9L15,12.16C15,12.11 15,12.05 15,12A3,3 0 0,0 12,9C11.94,9 11.89,9 11.83,9M7.53,9.8L9.08,11.35C9.03,11.56 9,11.77 9,12A3,3 0 0,0 12,15C12.22,15 12.44,14.97 12.65,14.92L14.2,16.47C13.53,16.8 12.79,17 12,17A5,5 0 0,1 7,12C7,11.21 7.2,10.47 7.53,9.8M2,4.27L4.28,6.55L4.73,7C3.08,8.3 1.78,10 1,12C2.73,16.39 7,19.5 12,19.5C13.55,19.5 15.03,19.2 16.38,18.66L16.81,19.08L19.73,22L21,20.73L3.27,3M12,7A5,5 0 0,1 17,12C17,12.64 16.87,13.26 16.64,13.82L19.57,16.75C21.07,15.5 22.27,13.86 23,12C21.27,7.61 17,4.5 12,4.5C10.6,4.5 9.26,4.75 8,5.2L10.17,7.35C10.74,7.13 11.35,7 12,7Z"/></svg></button>
+          <nav id="ez-crumbs" aria-label="Selected block path"></nav>
+          <div id="ez-canvas-wrap">
+            <iframe id="ez-frame" title="Email canvas"></iframe>
+          </div>
+        </div>
+        <aside id="nl-outlook-pane" hidden>
+          <div class="nl-outlook-bar">
+            <div class="nl-outlook-title">
+              <strong>Old Outlook</strong>
+              <button type="button" id="nl-outlook-close" aria-label="Close Old Outlook preview">×</button>
+            </div>
+            <span>Square buttons. This is the Outlook copy of the email, not a live Word window.</span>
+          </div>
+          <iframe id="nl-outlook-frame" title="Old Outlook preview" sandbox="allow-same-origin"></iframe>
+        </aside>
+      </div>
+    </div>
+    <div id="ez-toasts" aria-live="polite" aria-atomic="false"></div>
+    <div id="ez-modal" hidden>
+      <div class="gjs-mdl-dialog" role="dialog" aria-modal="true">
+        <div class="ez-modal-bar">
+          <strong id="ez-modal-title">Paste HTML</strong>
+          <button type="button" id="ez-modal-x" aria-label="Close">×</button>
+        </div>
+        <div id="ez-modal-body"></div>
+      </div>
+    </div>
+    <script src="./js/blocks.js"></script>
+    <script src="./js/mail.js"></script>
+    <script src="./js/editor.js"></script>
+    <script src="./js/studio.js"></script>
+    <script>
+      (function () {
+        var key = 'newsletter-project-theme';
+        var root = document.documentElement;
+        var button = document.getElementById('nl-theme');
+        function darkOn() { return root.getAttribute('data-nl-theme') === 'dark'; }
+        function paintButton() {
+          if (!button) return;
+          var on = darkOn();
+          button.setAttribute('aria-pressed', on ? 'true' : 'false');
+          button.classList.toggle('is-on', on);
+        }
+        function setTheme(on) {
+          if (on) root.setAttribute('data-nl-theme', 'dark');
+          else root.removeAttribute('data-nl-theme');
+          try { localStorage.setItem(key, on ? 'dark' : 'light'); } catch (err) {}
+          paintButton();
+          document.dispatchEvent(new CustomEvent('nl-theme'));
+        }
+        paintButton();
+        if (button) button.addEventListener('click', function () { setTheme(!darkOn()); });
+      })();
+    </script>
+  </body>
+</html>
