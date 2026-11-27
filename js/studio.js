@@ -104,6 +104,7 @@
       { label: 'Old Outlook preview', hint: 'View', run: click('nl-outlook') },
       { label: 'View components (outlines)', hint: 'View', run: click('ez-outlines') },
       { label: 'Toggle images', hint: 'View', run: click('ez-images') },
+      { label: 'Fixed 600px width (non-responsive) on/off', hint: 'Page · min-width', run: function () { api.fixedWidth(!api.fixedWidth()); } },
       { label: 'Desktop', hint: 'Device', run: function () { app.setDevice('Desktop'); } },
       { label: 'Tablet', hint: 'Device', run: function () { app.setDevice('Tablet'); } },
       { label: 'Mobile landscape', hint: 'Device', run: function () { app.setDevice('Mobile landscape'); } },

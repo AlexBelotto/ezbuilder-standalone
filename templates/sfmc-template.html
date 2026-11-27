@@ -17,6 +17,8 @@
 
     What this file adds: the 600px centered column, the Content Builder wrapper fixes,
     phone sizing, light mode only, and the Outlook (Word) settings.
+    With "Fixed 600px width" on in EzBuilder, the phone sizing is skipped for that email:
+    it stays 600px wide and the phone zooms it out.
 
     Leave the two <custom ... type="tracking"> tags where they are.
     Page color: EzBuilder's page background is not part of Copy body. If your email uses
@@ -137,6 +139,30 @@
       img {
         max-width: 100% !important;
         height: auto !important;
+      }
+      /* Fixed 600px width (EzBuilder > Page settings): the email keeps its 600px look
+         on phones, and the phone zooms it out. Copy body then wraps the email in
+         .nl-fixed-600, and these win over the shrink rules above. */
+      .email-shell table.nl-fixed-600.nl-fixed-600 {
+        width: 600px !important;
+        min-width: 600px !important;
+        max-width: 600px !important;
+      }
+      .email-shell table.nl-fixed-page.nl-fixed-page,
+      .email-shell td.nl-fixed-cell.nl-fixed-cell {
+        min-width: 600px !important;
+        max-width: none !important;
+      }
+    }
+  </style>
+  <!-- In its own style tag: a mail app that cannot read :has() drops only this part. -->
+  <style type="text/css">
+    @media only screen and (max-width: 620px) {
+      .email-shell:has(.nl-fixed-600),
+      .stylingblock-content-wrapper:has(.nl-fixed-600) {
+        width: 600px !important;
+        min-width: 600px !important;
+        max-width: none !important;
       }
     }
   </style>

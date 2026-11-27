@@ -1426,6 +1426,110 @@ def t_sfmc(b):
     else: pg.screenshot(path=os.path.join(SHOTS, 'standalone_sfmc_mobile.png'), full_page=True)
     ctx.close()
 
+def t_fixed600(b, url):
+  a = App(b, url)
+  a.clear(); a.ev("()=>EzApp._.forget()")
+  for k in ('email-hero', 'text', 'sect50', 'button', 'email-social-group'): a.ev("(x)=>EzApp.add(x,{quiet:true})", k)
+  a.wait(200); a.ev("()=>EzApp.select(null)")
+  off = a.export(); off_body = a.ev("()=>NewsletterHtmlIO.exportBody(EzApp.editor)")
+  check('Fixed 600px: off by default', a.ev("()=>EzApp._.fixedWidth()") is False)
+  check('Fixed 600px off: export has no fixed shell, styles or min-width', 'nl-fixed' not in off and 'min-width:600px' not in off.replace(' ', '') and 'content="width=device-width, initial-scale=1.0"' in off)
+  # where it lives: Settings with the page selected, Edit > Dimension, Ctrl+K
+  a.tab('config')
+  sw = a.field('config', 'fixed-width')
+  check('Settings (page selected) shows the Fixed 600px width switch, off', sw.count() == 1 and sw.is_checked() is False and 'Fixed 600px width' in a.ev("()=>document.querySelector('#ez-panel-config').innerText"))
+  h0 = hist(a)['undo']
+  a.pg.locator('#ez-panel-config .ez-switch').click(); a.wait(200)
+  check('clicking the switch turns it on (badge reads 600px fixed)', a.ev("()=>EzApp._.fixedWidth()") is True and a.field('config', 'fixed-width').is_checked() and a.ev("()=>document.querySelector('#nl-toolbar .width').textContent") == '600px fixed')
+  check('turning it on is one undo step', hist(a)['undo'] == h0 + 1, hist(a))
+  a.tab('edit')
+  check('Edit > Dimension (page) shows the same switch, on', a.field('edit', 'fixed-width').count() == 1 and a.field('edit', 'fixed-width').is_checked())
+  a.ev("()=>EzApp.undo()"); a.wait(150)
+  check('undo turns it off again', a.ev("()=>EzApp._.fixedWidth()") is False and a.ev("()=>document.querySelector('#nl-toolbar .width').textContent") == '600px')
+  a.ev("()=>EzApp.redo()"); a.wait(150)
+  check('redo turns it back on', a.ev("()=>EzApp._.fixedWidth()") is True)
+  a.ev("()=>EzApp._.fixedWidth(false)"); a.wait(100)
+  a.pg.keyboard.press('Control+k'); a.wait(200); a.pg.keyboard.type('fixed 600'); a.wait(200)
+  rows = a.ev("()=>[...document.querySelectorAll('.ez-pal-row .ez-pal-name')].map(e=>e.textContent)")
+  check('Ctrl+K lists the Fixed 600px width command', bool(rows) and 'Fixed 600px width' in rows[0], rows[:3])
+  a.pg.keyboard.press('Enter'); a.wait(200)
+  check('the Ctrl+K command toggles it on', a.ev("()=>EzApp._.fixedWidth()") is True)
+  a.ev("()=>EzStudio && EzStudio.hideAll && EzStudio.hideAll()")
+  # export
+  h = a.export(); body = a.ev("()=>NewsletterHtmlIO.exportBody(EzApp.editor)")
+  flat = h.replace(' ', '')
+  col = re.search(r'<table[^>]*class="nl-fixed-600"[^>]*>', h)
+  check('Copy HTML: a 600px fixed column with width="600" and min-width:600px', col is not None and 'width="600"' in col.group(0) and 'min-width:600px' in col.group(0).replace(' ', ''), col.group(0) if col else h[:400])
+  check('Copy HTML: the page table, cells and Gmail line keep min-width:600px', all(x in h for x in ('nl-fixed-page', 'nl-fixed-cell', 'nl-fixed-gmail')) and 'min-width:600px!important' in flat)
+  check('Copy HTML: viewport is width=600 and body has min-width:600px', 'content="width=600"' in h and re.search(r'<body[^>]*min-width:\s*600px', h) is not None)
+  check('Copy body: has the fixed column and its !important rules', 'class="nl-fixed-600"' in body and 'table.nl-fixed-600.nl-fixed-600' in body and ':has(.nl-fixed-600)' in body)
+  # editor phone previews keep 600px
+  for dev, w in (('Mobile portrait', 375), ('Mobile landscape', 480)):
+    a.ev("(d)=>EzApp.setDevice(d)", dev); a.wait(250)
+    m = a.fev("()=>({vw: innerWidth, body: Math.round(document.body.getBoundingClientRect().width), scroll: document.documentElement.scrollWidth})")
+    check('%s preview: the email keeps 600px (scrolls sideways)' % dev, m['vw'] <= w and m['body'] == 600 and m['scroll'] >= 600, m)
+  a.ev("()=>EzApp._.fixedWidth(false)"); a.wait(150)
+  m = a.fev("()=>({vw: innerWidth, body: Math.round(document.body.getBoundingClientRect().width)})")
+  check('fixed off: the mobile preview shrinks to the screen again', m['body'] <= m['vw'] <= 480, m)
+  a.ev("()=>EzApp._.fixedWidth(true)"); a.ev("()=>EzApp.setDevice('Desktop')"); a.wait(200)
+  check('desktop preview: the column is 600px', a.fev("()=>Math.round(document.body.getBoundingClientRect().width)") == 600)
+  # Old Outlook preview
+  a.pg.locator('#nl-outlook').click(); a.wait(1200)
+  ol = a.pg.evaluate("()=>{const d=document.getElementById('nl-outlook-frame').contentDocument; const t=d.querySelector('table.nl-fixed-600'); return {w: t ? Math.round(parseFloat(d.defaultView.getComputedStyle(t).width)) : null, has: !!t}}")
+  check('Old Outlook preview: the fixed column renders at 600px', ol['has'] and ol['w'] == 600, ol)
+  a.ev("()=>EzApp._.fixedWidth(false)"); a.wait(1200)
+  wide = a.pg.evaluate("()=>{const d=document.getElementById('nl-outlook-frame').contentDocument; return Math.max(...[...d.querySelectorAll('table,td')].map(e=>parseFloat(d.defaultView.getComputedStyle(e).width)||0))}")
+  check('Old Outlook preview: a hero with side padding stays inside 600px (its text table no longer adds the padding)', wide <= 600.5, wide)
+  a.ev("()=>EzApp._.fixedWidth(true)"); a.wait(150)
+  a.pg.locator('#nl-outlook').click(); a.wait(200)
+  # persistence
+  a.ev("()=>EzApp._.save()"); a.pg.reload(); a.pg.wait_for_function('()=>window.EzApp && window.EzApp.column()', timeout=15000); a.wait(300)
+  a.frame = a.pg.locator('#ez-frame').element_handle().content_frame()
+  check('Fixed 600px stays on after a reload', a.ev("()=>EzApp._.fixedWidth()") is True and a.ev("()=>document.querySelector('#nl-toolbar .width').textContent") == '600px fixed')
+  check('the export after reload is the same', a.export() == h)
+  # paste round trips
+  cur = h
+  for n in range(3):
+    a.ev("(x)=>NewsletterHtmlIO.importHtml(EzApp.editor, x, {force:true})", cur); a.wait(200)
+    nxt = a.export()
+    check('Paste Copy HTML round trip %d: stays on, one fixed column, export unchanged' % (n + 1), a.ev("()=>EzApp._.fixedWidth()") is True and nxt.count('class="nl-fixed-600"') == 1 and nxt == h, (nxt.count('nl-fixed-600'), len(nxt), len(h)))
+    cur = nxt
+  a.ev("(x)=>NewsletterHtmlIO.importHtml(EzApp.editor, x, {force:true})", off); a.wait(200)
+  check('pasting a responsive email turns it off', a.ev("()=>EzApp._.fixedWidth()") is False and a.export() == off)
+  cb = body
+  for n in range(3):
+    a.ev("(x)=>NewsletterHtmlIO.importHtml(EzApp.editor, x, {force:true})", cb); a.wait(200)
+    nb = a.ev("()=>NewsletterHtmlIO.exportBody(EzApp.editor)")
+    check('Paste Copy body round trip %d: turns it on, no double shell, body unchanged' % (n + 1), a.ev("()=>EzApp._.fixedWidth()") is True and nb.count('class="nl-fixed-600"') == 1 and nb == body, nb.count('nl-fixed-600'))
+    cb = nb
+  check('no extra CSS left in the page after the pastes', 'nl-fixed' not in a.ev("()=>EzApp.editor.getCss()"))
+  a.pg.locator('#ez-panel-config').count(); a.ev("()=>EzApp.select(null)"); a.tab('config')
+  a.pg.locator('#ez-panel-config .ez-switch').click(); a.wait(200)
+  check('switching it off removes the shell: export is the responsive one again', a.ev("()=>EzApp._.fixedWidth()") is False and a.export() == off)
+  check('Fixed 600px: no console or page errors', not a.errors, a.errors)
+  a.ctx.close()
+  # how mail apps and the Salesforce template lay it out on a phone
+  path = os.path.join(ROOT, 'templates', 'sfmc-template.html')
+  tpl = open(path, encoding='utf-8').read()
+  slot = re.search(r'<div data-type="slot" data-key="bodycontent"[^>]*></div>', tpl).group(0)
+  check('SFMC template keeps .nl-fixed-600 at 600px on phones', 'table.nl-fixed-600.nl-fixed-600' in tpl and ':has(.nl-fixed-600)' in tpl)
+  def wrap(bd):
+    return tpl.replace(slot, '<table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="min-width: 100%;" class="stylingblock-content-wrapper"><tr><td class="stylingblock-content-wrapper camarker-inner">' + bd + '</td></tr></table>')
+  M = """()=>{const s=document.querySelector('.email-shell'); const f=document.querySelector('table.nl-fixed-600'); const hero=document.querySelector('.nl-fixed-600 table');
+    return {vw: innerWidth, shell: s ? Math.round(s.getBoundingClientRect().width) : null, col: f ? Math.round(f.getBoundingClientRect().width) : null, inner: hero ? Math.round(hero.getBoundingClientRect().width) : null, scroll: document.documentElement.scrollWidth}}"""
+  for label, page, fixed in (('SFMC + Copy body (on)', wrap(body), True), ('SFMC + Copy body (off)', wrap(off_body), False), ('Copy HTML (on)', h, True)):
+    ctx = b.new_context(viewport={'width': 375, 'height': 800}); pg = ctx.new_page(); errs = []
+    pg.on('pageerror', lambda e: errs.append(str(e)))
+    pg.set_content(page); pg.wait_for_timeout(300)
+    r = pg.evaluate(M)
+    if fixed:
+      check('%s at 375px: stays 600px wide, does not shrink to the screen' % label, r['col'] == 600 and r['inner'] == 600 and r['scroll'] >= 600 and (label.startswith('Copy HTML') or r['shell'] >= 600), r)
+    else:
+      check('%s at 375px: responsive as before (375px, no sideways scroll)' % label, r['col'] is None and r['shell'] == 375 and r['scroll'] <= 375, r)
+    check('%s: no page errors' % label, not errs, errs)
+    if label.startswith('SFMC + Copy body (on)'): pg.screenshot(path=os.path.join(SHOTS, 'standalone_fixed600_mobile.png'), full_page=True)
+    ctx.close()
+
 def main():
   with sync_playwright() as p:
     b = p.chromium.launch()
@@ -1454,6 +1558,8 @@ def main():
     except Exception as e: check('t_persistence ran without a test crash', False, repr(e)[:800])
     try: t_sfmc(b)
     except Exception as e: check('t_sfmc ran without a test crash', False, repr(e)[:800])
+    try: t_fixed600(b, url)
+    except Exception as e: check('t_fixed600 ran without a test crash', False, repr(e)[:800])
     try: t_layout(b, url, 'http://127.0.0.1:%d/index.html' % srv.server_address[1])
     except Exception as e: check('t_layout ran without a test crash', False, repr(e)[:800])
     srv.shutdown(); b.close()

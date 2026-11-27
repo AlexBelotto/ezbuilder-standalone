@@ -1,3 +1,19 @@
+# Fixed 600px width (non-responsive) (27 Nov 2026)
+
+- **Where:** click empty canvas (the page). The switch "Fixed 600px width (non-responsive)" is in Settings and in Edit > Dimension, and Ctrl+K has "Fixed 600px width (non-responsive) on/off". It is off by default. While it is on, the toolbar badge reads **600px fixed**. It is saved with the email in this browser and works with undo and redo.
+- **Editor:** the page keeps min-width:600px, so the Mobile portrait and Mobile landscape previews stay 600px wide and scroll sideways instead of shrinking.
+- **Export (Copy HTML and Copy body):** the email goes in a shell that does not shrink:
+  - a 100% page table and its cell with min-width:600px;
+  - a `table.nl-fixed-600` column with `width="600"` and width, min-width and max-width at 600px;
+  - a no-wrap line hidden from Outlook that Gmail's apps cannot squeeze;
+  - `!important` rules for the shell, with `:has()` in its own style tag so a client that cannot read it drops only that tag;
+  - in Copy HTML, the viewport becomes `width=600` and the body gets min-width:600px.
+- **When it is off,** the export is exactly as before.
+- **Paste HTML:** pasting a fixed export (Copy HTML or Copy body) turns the switch on and removes the shell, so nothing doubles across round trips. Pasting a responsive email turns it off.
+- **Salesforce template:** `templates/sfmc-template.html` keeps `.nl-fixed-600` (and the Content Builder wrapper, via `:has()`) at 600px under its phone rules. A responsive email still shrinks to the screen.
+- **Fixed, Old Outlook:** an aligned or colored line inside a padded cell (the hero has 32px side padding) got an Outlook table as wide as the whole box. With the padding that made the email 664px in Old Outlook. Those tables now subtract the cell padding.
+- Tests: `t_fixed600` (39 checks). Full suite 482/482.
+
 # Clean source names (27 Nov 2026)
 
 - The app files (`index.html`, `css/`, `js/`, `templates/`) no longer mention the previous editor at all. The dialog class is now `.ez-mdl-dialog`, and the commands are `ez-get-inlined-html` and `ez-open-import-template`. Code comments describe the behavior directly. Nothing changes in the editor or the exported HTML.

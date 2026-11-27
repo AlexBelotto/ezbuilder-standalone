@@ -360,6 +360,7 @@
 
   function changed() {
     colorCache = null;
+    paintFixedBadge();
     saveSoon();
     trigger('update');
     placeChrome();
@@ -2981,6 +2982,60 @@
     applyBody();
   }
 
+  // Fixed width: the email keeps its 600px look on phones instead of shrinking
+  // to the screen. It is kept as min-width:600px on the page (saved, undone
+  // and pasted back with the rest of the page), and the export reads it there.
+  function fixedWidth() {
+    return String(bodyRules['min-width'] || '').replace(/\s+/g, '').toLowerCase() === '600px';
+  }
+
+  function setFixedWidth(on) {
+    on = !!on;
+    if (on === fixedWidth()) return;
+    snapshot();
+    if (on) bodyRules['min-width'] = '600px';
+    else delete bodyRules['min-width'];
+    applyBody();
+    paintSettings();
+    changed();
+    status(on ? 'Fixed 600px width is on. The email keeps its look on phones.' : 'Fixed 600px width is off. The email fits the screen again.');
+  }
+
+  function paintFixedBadge() {
+    var on = fixedWidth();
+    var badge = document.querySelector('#nl-toolbar .brand .width');
+    if (badge) {
+      badge.textContent = on ? '600px fixed' : '600px';
+      badge.classList.toggle('is-fixed', on);
+      badge.title = on ? 'Fixed 600px width: the email does not shrink on phones.' : 'Responsive: the 600px column shrinks to fit phones.';
+    }
+    if (doc && doc.documentElement) doc.documentElement.classList.toggle('ez-fixed-600', on);
+  }
+
+  function fixedWidthField() {
+    var wrap = fieldShell('Fixed 600px width (non-responsive)');
+    wrap.classList.add('ez-wide', 'ez-switch-field');
+    var label = document.createElement('label');
+    label.className = 'ez-switch';
+    var box = document.createElement('input');
+    box.type = 'checkbox';
+    box.setAttribute('role', 'switch');
+    box.setAttribute('data-ez-field', 'fixed-width');
+    box.checked = fixedWidth();
+    box.setAttribute('aria-checked', box.checked ? 'true' : 'false');
+    var track = document.createElement('span');
+    track.className = 'ez-switch-track';
+    var text = document.createElement('span');
+    text.className = 'ez-switch-text';
+    text.textContent = box.checked ? 'On: keeps 600px on phones' : 'Off: shrinks to fit phones';
+    box.addEventListener('change', function () { setFixedWidth(box.checked); });
+    label.appendChild(box);
+    label.appendChild(track);
+    label.appendChild(text);
+    wrap.appendChild(label);
+    return wrap;
+  }
+
   function pageFields() {
     var faces = FONTS.map(function (face) { return [face, face.split(',')[0].replace(/"/g, '')]; });
     var family = bodyRules['font-family'] || FONT;
@@ -2989,6 +3044,7 @@
     font.classList.add('ez-wide');
     return {
       dimension: [
+        fixedWidthField(),
         note('The column stays 600px wide. Padding here is the page around that column.'),
         unitField('Padding', bodyRules.padding || '0', 'page-padding', function (value) { writeBodyRule('padding', String(value || '').trim()); }, ['px', '%', 'em', 'rem'], true)
       ],
@@ -3028,6 +3084,8 @@
 
   function paintConfig(body, el) {
     if (!el) {
+      body.appendChild(fixedWidthField());
+      body.appendChild(note('On: the email stays 600px wide on phones (they zoom it out) instead of shrinking to the screen. Copy HTML and Copy body both keep it.'));
       body.appendChild(note('Choose a block to edit its label, link, image, spacing, or width. Type, color, and spacing live in Edit.'));
       return;
     }
@@ -4864,6 +4922,7 @@
       frame.removeEventListener('load', onLoad);
       doc = frame.contentDocument;
       applyBody();
+      paintFixedBadge();
       settleDrops();
       markTree(doc.body);
       Array.prototype.forEach.call(doc.querySelectorAll('[data-nl="social-icons"]'), spaceSocial);
@@ -4907,7 +4966,8 @@
           remove: removeSelected,
           editing: function () { return !!editing; },
           save: saveNow,
-          addAt: addAfterSelection
+          addAt: addAfterSelection,
+          fixedWidth: function (on) { if (on == null) return fixedWidth(); setFixedWidth(on); }
         }
       };
       document.dispatchEvent(new CustomEvent('ez-ready'));

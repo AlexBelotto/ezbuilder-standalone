@@ -227,6 +227,7 @@
   function dropOwnCss(css) {
     return String(css || '')
       .replace(/\.nl-(?:ow\d+|vbg)\s*\{[^}]*\}/g, '')
+      .replace(/[^{}]*\.nl-fixed-[\w-]+[^{}]*\{[^}]*\}/g, '')
       .replace(/[vo]\\:\*\s*\{[^}]*\}/g, '')
       .replace(/^\s+$/gm, '')
       .trim();
@@ -381,6 +382,7 @@
 
   // emailColumn: the 100% table and the centered 600px table around everything.
   function undoEmailColumn(body) {
+    if (undoFixedColumn(body)) return;
     var outer = onlyElementIgnoringComments(body);
     var outerCell = soleCell(outer);
     if (!outerCell || outer.getAttribute('role') !== 'presentation' || outer.getAttribute('width') !== '100%') return;
@@ -391,6 +393,22 @@
     if (!/^width:600px;max-width:600px;border-collapse:collapse/.test(compactStyle(column))) return;
     while (columnCell.firstChild) body.insertBefore(columnCell.firstChild, outer);
     removeNode(outer);
+  }
+
+  // fixedColumn: the shell that keeps a fixed-width email at 600px.
+  function undoFixedColumn(body) {
+    var outer = onlyElementIgnoringComments(body);
+    if (!outer || outer.tagName !== 'TABLE' || !/(?:^|\s)nl-fixed-page(?:\s|$)/.test(outer.getAttribute('class') || '')) return false;
+    var column = outer.querySelector('table.nl-fixed-600');
+    var cell = column && column.rows[0] && column.rows[0].cells[0];
+    if (!cell) return false;
+    Array.prototype.forEach.call(column.querySelectorAll('td.nl-fixed-gmail'), function (gmail) {
+      var row = gmail.parentElement;
+      if (row && row.parentNode) row.parentNode.removeChild(row);
+    });
+    while (cell.firstChild) body.insertBefore(cell.firstChild, outer);
+    removeNode(outer);
+    return true;
   }
 
   function onlyElementIgnoringComments(node) {
@@ -577,16 +595,21 @@
       if (!ok) return { cancelled: true };
     }
 
+    // A fixed-width export (Copy HTML or Copy body) turns Fixed 600px width back on.
+    var pastedFixed = /\bnl-fixed-600\b/.test(parsed.html);
     parsed.html = stripLeakedClosers(rescueMsoButtons(undoExport(parsed.html, parsed.fluid)));
     if (typeof editor.loadHtml === 'function') {
       editor.loadHtml(parsed.html, parsed.css || '');
-      if (parsed.bodyAttrs && editor.setBodyStyle) {
+      var pastedRules = {};
+      if (parsed.bodyAttrs) {
         var pastedStyle = (parsed.bodyAttrs.match(/style\s*=\s*(['"])([\s\S]*?)\1/i) || [])[2];
         var pastedBg = (parsed.bodyAttrs.match(/bgcolor\s*=\s*(['"])?([^"'\s>]+)\1?/i) || [])[2];
-        var pastedRules = pastedStyle ? styleToObject(pastedStyle) : {};
+        pastedRules = pastedStyle ? styleToObject(pastedStyle) : {};
         if (pastedBg && !pastedRules['background-color']) pastedRules['background-color'] = pastedBg;
-        editor.setBodyStyle(pastedRules);
       }
+      if (pastedFixed || isFixedBody('min-width:' + (pastedRules['min-width'] || ''))) pastedRules['min-width'] = FIXED_WIDTH + 'px';
+      else if (!pastedRules['min-width']) pastedRules['min-width'] = '';
+      if (editor.setBodyStyle) editor.setBodyStyle(pastedRules);
       if (parsed.title) {
         try { localStorage.setItem(TITLE_KEY, parsed.title); } catch (err) {}
       }
@@ -754,6 +777,38 @@
       '</table></td></tr></table>';
   }
 
+  // Fixed width (Page settings): the email keeps its 600px look on phones. The
+  // editor keeps it as min-width:600px on the page. The export puts the column
+  // in a shell that will not shrink: min-width on the tables and cells for
+  // Apple Mail, Outlook and most webmail, a no-wrap line that Gmail's apps
+  // cannot squeeze, and !important rules that win over a template's phone
+  // rules (the Salesforce template sets 600px tables to 100% on phones).
+  var FIXED_WIDTH = 600;
+
+  function isFixedBody(style) {
+    return /(?:^|;)\s*min-width\s*:\s*600px\s*(?:!important\s*)?(?:;|$)/i.test(String(style || ''));
+  }
+
+  function fixedColumn(inner) {
+    var nbsp = [];
+    for (var i = 0; i < 33; i++) nbsp.push('&nbsp;');
+    return '<table role="presentation" class="nl-fixed-page" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;min-width:' + FIXED_WIDTH + 'px;border-collapse:collapse;">' +
+      '<tr><td align="center" class="nl-fixed-cell" style="min-width:' + FIXED_WIDTH + 'px;">' +
+      '<table role="presentation" class="nl-fixed-600" cellpadding="0" cellspacing="0" border="0" align="center" width="' + FIXED_WIDTH + '" style="width:' + FIXED_WIDTH + 'px;min-width:' + FIXED_WIDTH + 'px;max-width:' + FIXED_WIDTH + 'px;border-collapse:collapse;">' +
+      '<tr><td class="nl-fixed-cell" width="' + FIXED_WIDTH + '" style="width:' + FIXED_WIDTH + 'px;min-width:' + FIXED_WIDTH + 'px;">' + inner + '</td></tr>' +
+      '<tr><td class="nl-fixed-gmail" style="min-width:' + FIXED_WIDTH + 'px;font-size:0;line-height:0;mso-line-height-rule:exactly;mso-hide:all;">' +
+      '<div style="white-space:nowrap;font:15px courier;line-height:0;color:transparent;mso-hide:all;">' + nbsp.join(' ') + '</div></td></tr>' +
+      '</table></td></tr></table>';
+  }
+
+  function fixedCss() {
+    var px = FIXED_WIDTH + 'px';
+    // :has() is in its own block: a client that cannot read it drops only that block.
+    return '<style type="text/css">table.nl-fixed-600.nl-fixed-600{width:' + px + ' !important;min-width:' + px + ' !important;max-width:' + px + ' !important;}' +
+      'table.nl-fixed-page.nl-fixed-page,td.nl-fixed-cell.nl-fixed-cell,td.nl-fixed-gmail.nl-fixed-gmail{min-width:' + px + ' !important;}</style>' +
+      '<style type="text/css">.email-shell:has(.nl-fixed-600),.stylingblock-content-wrapper:has(.nl-fixed-600){width:' + px + ' !important;min-width:' + px + ' !important;max-width:none !important;}</style>';
+  }
+
   function exportHtml(editor) {
     var fragment = String(inlinedFragment(editor)).trim();
     var styles = [];
@@ -774,10 +829,12 @@
     bodyOpen = ensureBodyFont(bodyOpen).replace(/\sstyle=(['"])([\s\S]*?)\1/i, function (_, quote, style) {
       return ' style=' + quote + declarations(style).join(';') + quote;
     });
-    inner = emailColumn(inner);
+    var fixed = isFixedBody((bodyOpen.match(/\sstyle=(['"])([\s\S]*?)\1/i) || [])[2]);
+    inner = fixed ? fixedColumn(inner) : emailColumn(inner);
     var sized = outlookSizes(inner, editor);
     inner = outlookBackgrounds(sized.html, measureBackgroundHeights(editor));
     if (sized.css) inner = sized.css + inner;
+    if (fixed) inner = fixedCss() + inner;
 
     var title = escapeText(emailTitle());
     var lang = escapeAttr(emailLang());
@@ -790,7 +847,7 @@
         '<style>v\\:* { behavior:url(#default#VML); display:inline-block; } o\\:* { behavior:url(#default#VML); }</style>\n<![endif]-->\n'
       : '';
     var documentHtml = '<!DOCTYPE html>\n' + htmlOpen + '\n<head>\n<meta charset="utf-8">\n' +
-      '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+      (fixed ? '<meta name="viewport" content="width=' + FIXED_WIDTH + '">\n' : '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n') +
       '<meta http-equiv="X-UA-Compatible" content="IE=edge">\n<title>' + title + '</title>\n' +
       msoHead + styles.join('\n') + '\n</head>\n' + bodyOpen + '\n' + inner + '\n</body>\n</html>\n';
     return restoreMergeCode(indentHtml(stripEditorBoxSizing(documentHtml)));
@@ -1879,6 +1936,25 @@
     return found;
   }
 
+  // The room a line has inside its cells. Word keeps a cell's padding, so an
+  // Outlook copy as wide as the whole box pushed it wider (a hero with 32px side
+  // padding grew to 664px in Old Outlook).
+  function lineWidth(el) {
+    var pad = 0;
+    var node = el.parentElement;
+    while (node && node.id !== 'nl-root') {
+      if (iconTextCell(node)) break;
+      var style = styleMap(node.getAttribute('style'));
+      if (node.tagName === 'TD' || node.tagName === 'TH') {
+        var sides = boxSides(paddingValue(style));
+        pad += sidePx(sides.left) + sidePx(sides.right);
+      }
+      if (pxLength(style.width) || digitLength(node.getAttribute('width'))) break;
+      node = node.parentElement;
+    }
+    return Math.max(1, elementWidth(el) - pad);
+  }
+
   // Word drops margin and color on a div, and ignores text-align unless the cell has align.
   function outlookText(root) {
     Array.prototype.slice.call(root.querySelectorAll('div, p, h1, h2, h3, h4, h5, h6')).forEach(function (el) {
@@ -1911,7 +1987,7 @@
       face = face || inherited.face;
       size = size || inherited.size;
       weight = weight || inherited.weight;
-      var width = Math.min(EMAIL_WIDTH, elementWidth(el));
+      var width = Math.min(EMAIL_WIDTH, lineWidth(el));
       // Word doubles the inset when a cell sets both padding and mso-padding-alt.
       var tdStyle = '';
       if (pad) tdStyle += 'mso-padding-alt:' + pad + ';';
